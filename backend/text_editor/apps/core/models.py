@@ -39,12 +39,29 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
         return self.email    
     
 
-class Documents(models.Model):
+class Document(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    
+   
     def __str__(self):
         return self.title
+
+class OperationalLog(models.Model):
+
+    CHOICES = (
+        ('insert','Insert'),
+        ('delete','Delete')
+    )
+    document = models.ForeignKey(Document, on_delete=models.CASCADE,related_name='logs')
+    operation = models.CharField(max_length=255,choices=CHOICES)
+    version = models.IntegerField(default=1)
+    updated_content = models.TextField()
+
+    def save(self, *args, **kwargs):
+        # Increment version only if the document already exists
+        if self.pk:
+            self.version += 1
+        super().save(*args, **kwargs)

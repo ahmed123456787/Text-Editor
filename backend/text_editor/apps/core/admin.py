@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import Documents, CustomUser
+from .models import Document, CustomUser
 
-@admin.register(Documents)
+@admin.register(Document)
 class DocumentsAdmin(admin.ModelAdmin):
     list_display = ('title', 'user', 'created_at', 'updated_at')
     list_filter = ('user', 'created_at')
