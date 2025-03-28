@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "daphne",
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,10 +45,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'text_editor.apps.document',
     'channels',
-      "drf_spectacular",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -74,6 +76,12 @@ TEMPLATES = [
         },
     },
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_HEADERS = ["accept",
+    "accept-encoding",
+    "authorization",]
+
 
 WSGI_APPLICATION = 'text_editor.wsgi.application'
 ASGI_APPLICATION = 'text_editor.asgi.application'
@@ -169,3 +177,4 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
+

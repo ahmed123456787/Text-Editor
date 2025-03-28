@@ -45,7 +45,7 @@ class WebSocketService {
   private establishConnection(documentId: string) {
     // Proper URL construction
     const token =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMTIxNTQ0LCJpYXQiOjE3NDMxMTc5NDQsImp0aSI6IjMwZWFjOTgyNDg5ZDRkZDE5NmYwYzRhZDllZjI4N2MyIiwidXNlcl9pZCI6MX0.s9cA7aBDiYXc1z2c492iSaHNCU-7mr2yQ-3coMSKl5M";
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMTgzOTE3LCJpYXQiOjE3NDMxODAzMTcsImp0aSI6ImI2ZTEwZTYwNjcxYTRlYzQ5MDVkMzk4MWUyNmM4N2EzIiwidXNlcl9pZCI6MX0.P4YgU_AlAeYs8dW5F2SzZYwUFQK6ER19LLOdNJb799E";
     const url = new URL(`/ws/document/${documentId}/`, this.baseUrl);
     url.searchParams.set("token", token);
 
@@ -69,6 +69,7 @@ class WebSocketService {
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("Received message:", data);
           this.messageHandlers.forEach((handler) => handler(data));
         } catch (error) {
           console.error("Error parsing message:", error);

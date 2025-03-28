@@ -4,6 +4,7 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 import jwt
 from django.conf import settings
+from text_editor.apps.core.models import Document
 
 User = get_user_model()
 
@@ -38,6 +39,12 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             self.document_id = self.scope['url_route']['kwargs']['document_id']
             self.room_group_name = f'document_{self.document_id}'
             
+            # Get the document content
+            document = await self.get_document()
+            if not document:
+                await self.close()
+                return
+                
             # Join room group
             await self.channel_layer.group_add(
                 self.room_group_name,
@@ -46,6 +53,13 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             
             # Accept the connection
             await self.accept()
+            
+            # Send document content to the newly connected user
+            await self.send(text_data=json.dumps({
+                'type': 'INITIALIZE',
+                'document': document,
+            }))
+            
         except jwt.PyJWTError:
             # Reject connection if token is invalid
             await self.close()
@@ -56,6 +70,30 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return None
+            
+    @database_sync_to_async
+    def get_document(self):
+        try:
+            document = Document.objects.get(id=self.document_id)
+            # Convert the document model to a serializable dictionary
+            return {
+                'id': str(document.id),
+                'title': document.title,
+                'content': document.content,
+                'last_updated': document.updated_at.isoformat(),
+            }
+        except Document.DoesNotExist:
+            return None
+            
+    @database_sync_to_async
+    def save_document_update(self, content):
+        try:
+            document = Document.objects.get(id=self.document_id)
+            document.content = content
+            document.save()
+            return True
+        except Document.DoesNotExist:
+            return False
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -66,22 +104,26 @@ class DocumentConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        print("data",data)
+        print("data", data)
+        
+        # Save the update to the database if it contains content
+        if 'content' in data:
+            await self.save_document_update(data['content'])
+            
         # Send message to room group
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'document_update',
+                'type': 'document_update',  # Must match the method name
                 'data': data,
-                'user_id': self.user.id
+                'user_id': str(self.user.id)
             }
         )
     
     async def document_update(self, event):
         # Send update to WebSocket
         await self.send(text_data=json.dumps({
-            'type': 'document_update',
+            'type': 'UPDATE',
             'data': event['data'],
             'user_id': event['user_id']
         }))
-

@@ -61,7 +61,6 @@ class OperationalLog(models.Model):
     updated_content = models.TextField()
 
     def save(self, *args, **kwargs):
-        # Increment version only if the document already exists
         if self.pk:
             self.version += 1
         super().save(*args, **kwargs)

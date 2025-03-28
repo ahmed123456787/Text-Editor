@@ -5,6 +5,5 @@ from text_editor.apps.core.models import Document
 class DocumentSerializer(ModelSerializer):
     class Meta:
         model = Document
-        fields = ['title','content']
-
-
+        fields = ['id','title','content','updated_at']
+        read_only_fields = ['updated_at','id']
