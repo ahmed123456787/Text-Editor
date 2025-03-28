@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { File, Menu } from "lucide-react";
 import { DocumentContext } from "../context/DocumentContext";
 
@@ -14,7 +14,7 @@ const SidebarContent = ({ isOpen, toggleSidebar }: SidebarContentProps) => {
     throw new Error("DocumentContext is not provided.");
   }
 
-  const { documents } = context;
+  const { documents, selectDocument } = context;
   return (
     <>
       <div className="flex items-center justify-between p-4">
@@ -32,7 +32,7 @@ const SidebarContent = ({ isOpen, toggleSidebar }: SidebarContentProps) => {
           >
             <File className="mr-2" size={20} />
             {isOpen && (
-              <div className="flex-1">
+              <div className="flex-1" onClick={() => selectDocument(doc.id)}>
                 <div className="text-sm font-medium">{doc.name}</div>
                 <div className="text-xs text-gray-500">{doc.last_update}</div>
               </div>

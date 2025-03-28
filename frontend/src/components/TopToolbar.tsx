@@ -1,5 +1,7 @@
 import { Share2, Save } from "lucide-react";
 import { Collaborator } from "../types";
+import { useContext } from "react";
+import { DocumentContext } from "../context/DocumentContext";
 
 interface TopToolbarProps {
   documentTitle: string;
@@ -7,6 +9,19 @@ interface TopToolbarProps {
 }
 
 const TopToolbar = ({ documentTitle, collaborators }: TopToolbarProps) => {
+  const context = useContext(DocumentContext);
+
+  if (!context) {
+    throw new Error("DocumentContext is not provided.");
+  }
+
+  const { setName, setSaved } = context;
+
+  const handleSave = () => {
+    // In a real app, you'd save to server here
+    setSaved(true);
+  };
+
   return (
     <div className="bg-white border-b p-1 flex justify-between items-center">
       <div className="flex items-center">
@@ -14,7 +29,7 @@ const TopToolbar = ({ documentTitle, collaborators }: TopToolbarProps) => {
           type="text"
           value={documentTitle}
           className="text-xl font-semibold bg-transparent outline-none"
-          onChange={(e) => console.log(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
         />
       </div>
 
@@ -39,7 +54,10 @@ const TopToolbar = ({ documentTitle, collaborators }: TopToolbarProps) => {
           <button className="p-2 hover:bg-gray-100 rounded">
             <Share2 size={20} />
           </button>
-          <button className="p-2 hover:bg-gray-100 rounded">
+          <button
+            className="p-2 hover:bg-gray-100 rounded"
+            onClick={handleSave}
+          >
             <Save size={20} />
           </button>
         </div>
