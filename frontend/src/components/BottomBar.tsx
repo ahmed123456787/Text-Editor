@@ -5,8 +5,7 @@ interface BottomStatusBarProps {
   saved: boolean;
 }
 
-const BottomStatusBar = ({ lastSaved, saved }: BottomStatusBarProps) => {
-  // Calculate word and character count (this would normally come from the document)
+const BottomBar = ({ lastSaved, saved }: BottomStatusBarProps) => {
   const wordCount = 245;
   const charCount = 1320;
 
@@ -24,4 +23,4 @@ const BottomStatusBar = ({ lastSaved, saved }: BottomStatusBarProps) => {
   );
 };
 
-export default BottomStatusBar;
+export default BottomBar;

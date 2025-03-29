@@ -1,5 +1,12 @@
-import { createContext, ReactNode, useState, useEffect } from "react";
+import {
+  createContext,
+  ReactNode,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { getDocuments } from "../services/apis/documentApi";
+import { websocketService } from "../services/websocket";
 
 interface Collaborator {
   id: string;
@@ -18,13 +25,14 @@ interface DocumentState {
 interface DocumentContextType {
   documents: DocumentState[];
   currentDocument: DocumentState | null;
-  isLoading: boolean; // Add loading state
-  error: string | null; // Add error state
+  isLoading: boolean;
+  error: string | null;
   setDocuments: React.Dispatch<React.SetStateAction<DocumentState[]>>;
   updateContent: (content: string) => void;
   setName: (name: string) => void;
   setSaved: (saved: boolean) => void;
   selectDocument: (id: string) => void;
+  wsConnected: boolean;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -42,15 +50,14 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
-  // Fetch documents on component mount
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
         setIsLoading(true);
         const data = await getDocuments();
 
-        // Map API data to our document state structure
         const formattedDocuments = data.map((doc: any) => ({
           content: doc.content || "",
           name: doc.title,
@@ -62,36 +69,12 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
 
         setDocuments(formattedDocuments);
 
-        // Set the first document as current if available
         if (formattedDocuments.length > 0) {
           setCurrentDocument(formattedDocuments[0]);
         }
       } catch (err) {
         console.error("Failed to fetch documents:", err);
         setError("Failed to load documents. Please try again later.");
-
-        // Fallback to sample documents if API fails
-        const sampleDocuments = [
-          {
-            content: "Welcome to the Text Editor!",
-            name: "Welcome Document",
-            saved: true,
-            last_update: "2 minutes ago",
-            id: "1",
-            collaborators: [{ id: "1", name: "You" }],
-          },
-          {
-            content: "This is a sample document.",
-            name: "Sample Document",
-            saved: true,
-            last_update: "5 minutes ago",
-            id: "2",
-            collaborators: [{ id: "2", name: "Bob" }],
-          },
-        ];
-
-        setDocuments(sampleDocuments);
-        setCurrentDocument(sampleDocuments[0]);
       } finally {
         setIsLoading(false);
       }
@@ -100,49 +83,114 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     fetchDocuments();
   }, []);
 
-  // Select a document by ID
-  const selectDocument = (id: string) => {
-    console.log("Selecting document with ID:", id);
-    const selected = documents.find((doc) => doc.id === id);
-    if (selected) {
-      setCurrentDocument(selected);
-    }
-  };
-
-  const updateContent = (content: string) => {
+  useEffect(() => {
     if (!currentDocument) return;
 
-    const updatedDocuments = documents.map((doc) =>
-      doc.id === currentDocument.id ? { ...doc, content, saved: false } : doc
-    );
+    websocketService.connect(currentDocument.id);
+    setWsConnected(true);
 
-    setDocuments(updatedDocuments);
-    setCurrentDocument({ ...currentDocument, content, saved: false });
-  };
+    const cleanup = websocketService.addMessageHandler((data) => {
+      console.log("WebSocket message received:", data);
+      if (data.type === "UPDATE") {
+        console.log("hello", data.document.content);
+        const updatedContent = data.document.content;
+        setDocuments((prevDocs) =>
+          prevDocs.map((doc) =>
+            doc.id === currentDocument.id
+              ? { ...doc, content: updatedContent }
+              : doc
+          )
+        );
 
-  const setName = (name: string) => {
-    if (!currentDocument) return;
+        setCurrentDocument((prevDoc) =>
+          prevDoc ? { ...prevDoc, content: updatedContent } : null
+        );
+      }
 
-    // Update the name of the current document
-    const updatedDocuments = documents.map((doc) =>
-      doc.id === currentDocument.id ? { ...doc, name } : doc
-    );
+      if (data.type === "collaborator_update") {
+      }
+    });
 
-    setDocuments(updatedDocuments);
-    setCurrentDocument({ ...currentDocument, name });
-  };
+    return () => {
+      cleanup();
+      websocketService.disconnect();
+      setWsConnected(false);
+    };
+  }, [currentDocument?.id]);
 
-  const setSaved = (saved: boolean) => {
-    if (!currentDocument) return;
+  const selectDocument = useCallback(
+    (id: string) => {
+      console.log("Selecting document with ID:", id);
+      const selected = documents.find((doc) => doc.id === id);
+      if (selected) {
+        if (currentDocument && currentDocument.id !== id) {
+          websocketService.disconnect();
+          setWsConnected(false);
+        }
 
-    // Update the saved status of the current document
-    const updatedDocuments = documents.map((doc) =>
-      doc.id === currentDocument.id ? { ...doc, saved } : doc
-    );
+        setCurrentDocument(selected);
+      }
+    },
+    [documents, currentDocument]
+  );
 
-    setDocuments(updatedDocuments);
-    setCurrentDocument({ ...currentDocument, saved });
-  };
+  const updateContent = useCallback(
+    (content: string) => {
+      if (!currentDocument) return;
+
+      const updatedDocuments = documents.map((doc) =>
+        doc.id === currentDocument.id ? { ...doc, content, saved: false } : doc
+      );
+
+      setDocuments(updatedDocuments);
+      setCurrentDocument({ ...currentDocument, content, saved: false });
+
+      if (wsConnected) {
+        websocketService.send({
+          type: "content_update",
+          document_id: currentDocument.id,
+          content: content,
+        });
+      }
+    },
+    [currentDocument, documents, wsConnected]
+  );
+
+  const setName = useCallback(
+    (name: string) => {
+      if (!currentDocument) return;
+
+      const updatedDocuments = documents.map((doc) =>
+        doc.id === currentDocument.id ? { ...doc, name } : doc
+      );
+
+      setDocuments(updatedDocuments);
+      setCurrentDocument({ ...currentDocument, name });
+
+      if (wsConnected) {
+        websocketService.send({
+          type: "name_update",
+          document_id: currentDocument.id,
+          name: name,
+        });
+      }
+    },
+    [currentDocument, documents, wsConnected]
+  );
+
+  const setSaved = useCallback(
+    (saved: boolean) => {
+      if (!currentDocument) return;
+
+      const updatedDocuments = documents.map((doc) =>
+        doc.id === currentDocument.id ? { ...doc, saved } : doc
+      );
+
+      setDocuments(updatedDocuments);
+      setCurrentDocument({ ...currentDocument, saved });
+    },
+    [currentDocument, documents]
+  );
 
   return (
     <DocumentContext.Provider
@@ -156,6 +204,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         setName,
         setSaved,
         selectDocument,
+        wsConnected,
       }}
     >
       {children}

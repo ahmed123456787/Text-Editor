@@ -8,7 +8,7 @@ interface TopToolbarProps {
   collaborators: Collaborator[];
 }
 
-const TopToolbar = ({ documentTitle, collaborators }: TopToolbarProps) => {
+const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
   const context = useContext(DocumentContext);
 
   if (!context) {
@@ -66,4 +66,4 @@ const TopToolbar = ({ documentTitle, collaborators }: TopToolbarProps) => {
   );
 };
 
-export default TopToolbar;
+export default TopBar;

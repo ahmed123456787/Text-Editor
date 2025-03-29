@@ -1,11 +1,13 @@
 import { useState, useContext } from "react";
 import SidebarContent from "./SidebarContent";
-import TopToolbar from "./TopToolbar";
+import TopBar from "./TopBar";
 import EditorArea from "./EditorArea";
 import CollaborationPanel from "./CollaboratorPanel";
-import BottomStatusBar from "./BottomStatusBar";
+import BottomBar from "./BottomBar";
 import { DocumentContext } from "../context/DocumentContext";
 import { Collaborator } from "../types";
+import Loading from "./Loading";
+import Eror from "./Eror";
 
 const CollaborativeTextEditor = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -15,7 +17,7 @@ const CollaborativeTextEditor = () => {
     throw new Error("DocumentContext is not provided.");
   }
 
-  const { currentDocument } = context;
+  const { currentDocument, isLoading, error } = context;
 
   // If no document is selected, show a default state
   if (!currentDocument) {
@@ -26,6 +28,26 @@ const CollaborativeTextEditor = () => {
     );
   }
 
+  if (!context) {
+    return <div>Context not available</div>;
+  }
+
+  if (isLoading) <Loading />;
+
+  if (error) <Eror error={error} />;
+
+  if (!currentDocument) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">No documents available</p>
+          <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Create New Document
+          </button>
+        </div>
+      </div>
+    );
+  }
   // Convert document collaborators to the expected format
   const collaborators: Collaborator[] = currentDocument.collaborators.map(
     (collab) => ({
@@ -56,7 +78,7 @@ const CollaborativeTextEditor = () => {
       {/* Main Editor Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Toolbar */}
-        <TopToolbar
+        <TopBar
           documentTitle={currentDocument.name}
           collaborators={collaborators}
         />
@@ -73,7 +95,7 @@ const CollaborativeTextEditor = () => {
         </div>
 
         {/* Bottom Status Bar */}
-        <BottomStatusBar
+        <BottomBar
           lastSaved={currentDocument.last_update}
           saved={currentDocument.saved}
         />

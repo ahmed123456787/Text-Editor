@@ -6,10 +6,12 @@ import jwt
 from django.conf import settings
 from text_editor.apps.core.models import Document
 
+
 User = get_user_model()
 
 class DocumentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        """Handle new WebSocket connection with token authentication"""
         # Extract token from query string
         query_string = self.scope.get('query_string', b'').decode('utf-8')
         query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
@@ -64,8 +66,52 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             # Reject connection if token is invalid
             await self.close()
     
+    async def disconnect(self, close_code):
+        """Handle WebSocket disconnection"""
+        # Leave room group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        """Handle messages received from WebSocket"""
+        data = json.loads(text_data)
+        print("Received data:", data)
+        
+        # Save document content if provided
+        if 'content' in data:
+            success = await self.save_document_update(data['content'])
+            if not success:
+                print(f"Failed to save document update for document_id: {self.document_id}")
+                return
+
+        # Get the updated document content
+        document = await self.get_document()
+        if not document:
+            await self.close()
+            return            
+        
+        # Send message to room group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'document_update',  # Must match the method name below
+                'document': document,
+            }
+        )
+    
+    async def document_update(self, event):
+        """Handle document_update messages from the channel layer"""
+        # Forward the document update to the WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'UPDATE',
+            'document': event['document'],
+        }))
+
     @database_sync_to_async
     def get_user(self, user_id):
+        """Get user by ID from database"""
         try:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -73,6 +119,7 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             
     @database_sync_to_async
     def get_document(self):
+        """Get document by ID from database"""
         try:
             document = Document.objects.get(id=self.document_id)
             # Convert the document model to a serializable dictionary
@@ -84,9 +131,10 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             }
         except Document.DoesNotExist:
             return None
-            
+
     @database_sync_to_async
     def save_document_update(self, content):
+        """Save document content update to database"""
         try:
             document = Document.objects.get(id=self.document_id)
             document.content = content
@@ -94,36 +142,3 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             return True
         except Document.DoesNotExist:
             return False
-
-    async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        print("data", data)
-        
-        # Save the update to the database if it contains content
-        if 'content' in data:
-            await self.save_document_update(data['content'])
-            
-        # Send message to room group
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'document_update',  # Must match the method name
-                'data': data,
-                'user_id': str(self.user.id)
-            }
-        )
-    
-    async def document_update(self, event):
-        # Send update to WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'UPDATE',
-            'data': event['data'],
-            'user_id': event['user_id']
-        }))
