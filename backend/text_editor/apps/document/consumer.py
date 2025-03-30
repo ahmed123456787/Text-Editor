@@ -4,8 +4,9 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 import jwt
 from django.conf import settings
-from text_editor.apps.core.models import Document
-
+from text_editor.apps.core.models import Document, OperationalLog
+from django.db import transaction
+from .utils import get_position_of_change_async
 
 User = get_user_model()
 
@@ -79,31 +80,39 @@ class DocumentConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         print("Received data:", data)
         
-        # Save document content if provided
-        if 'content' in data:
-            success = await self.save_document_update(data['content'])
+        operation_type = data.get('type')
+        
+        if operation_type == 'UPDATE':
+            # Process operation of update document content
+            position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
+            success = await self.save_operation(self.document_id, opertype, position, changed_content, last_version_log)
             if not success:
-                print(f"Failed to save document update for document_id: {self.document_id}")
+                print(f"Failed to save operation for document_id: {self.document_id}")
                 return
+       
 
-        # Get the updated document content
+        # Build the last version of the document
         document = await self.get_document()
         if not document:
             await self.close()
             return            
         
-        # Send message to room group
+        # Send message to room group using the document_update method.
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'document_update',  # Must match the method name below
-                'document': document,
+                'type': 'document_update',
+                'document': {
+                    'id': str(document['id']),
+                    'content': data['content'],
+                    'version': document['version'],
+                },
             }
         )
     
     async def document_update(self, event):
         """Handle document_update messages from the channel layer"""
-        # Forward the document update to the WebSocket
+        # Forward the document update to the all connected to this room group
         await self.send(text_data=json.dumps({
             'type': 'UPDATE',
             'document': event['document'],
@@ -128,17 +137,40 @@ class DocumentConsumer(AsyncWebsocketConsumer):
                 'title': document.title,
                 'content': document.content,
                 'last_updated': document.updated_at.isoformat(),
+                'version': document.current_version,
             }
         except Document.DoesNotExist:
             return None
+    
 
     @database_sync_to_async
-    def save_document_update(self, content):
-        """Save document content update to database"""
-        try:
-            document = Document.objects.get(id=self.document_id)
-            document.content = content
-            document.save()
-            return True
-        except Document.DoesNotExist:
-            return False
+    def save_operation(self, document_id, operation_type, position, new_content, last_version_log):
+        """Save operation log and update document if needed exceed the 50 version"""
+
+        with transaction.atomic():
+            try:
+                # Get the document
+                document = Document.objects.get(id=document_id)
+                
+                # Create operation log
+                OperationalLog.objects.create(
+                    document_id=document_id,
+                    operation=operation_type,
+                    position=position,
+                    version=last_version_log + 1,
+                    updated_content=new_content,
+                )
+                
+                # Update document content every 50 versions
+                if last_version_log % 50 == 0:
+                    # Update document with new content
+                    document.content = new_content
+                
+                # Increment document version
+                document.current_version += 1
+                document.save()
+                
+                return True
+            except Exception as e:
+                print(f"Error saving operation: {e}")
+                return False

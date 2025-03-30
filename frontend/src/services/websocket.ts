@@ -95,7 +95,7 @@ class WebSocketService {
   }
 
   private getAuthToken(): string {
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMjYzNDE1LCJpYXQiOjE3NDMyNTk4MTUsImp0aSI6IjkyZDA2ZTcxM2E1MTQ0ZWFiMjE2NmMxNTM1NzAxYzBjIiwidXNlcl9pZCI6MX0.VfCKLoS-iFvX-aLVqDezyjiRtoV2dp_i_-xoneHi-Wg";
+    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMjk2NTE3LCJpYXQiOjE3NDMyOTI5MTcsImp0aSI6IjE1ZTdmMmM0NThiYjRlMzFiNzJhN2Q0ZDM0YTRiMDcwIiwidXNlcl9pZCI6MX0.GT7byyPUVfP1_bz9zFFa_STMtlYniR-Esq4y_fVRd04";
   }
 
   private setupSocketEventHandlers(documentId: string): void {

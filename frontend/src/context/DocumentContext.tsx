@@ -106,9 +106,6 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
           prevDoc ? { ...prevDoc, content: updatedContent } : null
         );
       }
-
-      if (data.type === "collaborator_update") {
-      }
     });
 
     return () => {
@@ -147,7 +144,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
 
       if (wsConnected) {
         websocketService.send({
-          type: "content_update",
+          type: "UPDATE",
           document_id: currentDocument.id,
           content: content,
         });

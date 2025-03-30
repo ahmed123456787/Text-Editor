@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Document, CustomUser
+from .models import Document, CustomUser,OperationalLog
 
 @admin.register(Document)
 class DocumentsAdmin(admin.ModelAdmin):
@@ -24,3 +24,5 @@ class CustomUserAdmin(admin.ModelAdmin):
             'fields': ('email', 'password1', 'password2'),
         }),
     )
+
+admin.site.register(OperationalLog)
