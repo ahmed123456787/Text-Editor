@@ -78,3 +78,5 @@ def get_position_of_change(document_id, new_content):
 def get_position_of_change_async(document_id, new_content):
     """Async wrapper for get_position_of_change function"""
     return get_position_of_change(document_id, new_content)
+
+

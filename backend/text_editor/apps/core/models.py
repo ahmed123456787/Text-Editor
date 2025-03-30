@@ -104,20 +104,35 @@ class Document(models.Model):
 
 class OperationalLog(models.Model):
     CHOICES = (
-        ('insert','Insert'),
-        ('delete','Delete'),
-        ('undo','Undo')  # Add undo operation type
+        ('insert', 'Insert'),
+        ('delete', 'Delete'),
+        ('undo', 'Undo')  # Add undo operation type
     )
 
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='logs')
     operation = models.CharField(max_length=255, choices=CHOICES)
     version = models.IntegerField(default=1)
-    updated_content = models.TextField(blank=True)
+    updated_content = models.TextField(blank=True)  # Store the full content of the document
     timestamp = models.DateTimeField(auto_now_add=True)
     position = models.IntegerField()
+    operation_data = JSONField(null=True, blank=True)  # Store operation details (e.g., text, length)
 
     class Meta:
         ordering = ['version']
 
     def __str__(self):
         return f"{self.document.title} - v{self.version} - {self.operation}"
+
+    @staticmethod
+    def create_log(document, operation, position, operation_data, updated_content):
+        """
+        Helper method to create an OperationalLog entry.
+        """
+        return OperationalLog.objects.create(
+            document=document,
+            operation=operation,
+            version=document.current_version + 1,
+            position=position,
+            operation_data=operation_data,
+            updated_content=updated_content,
+        )

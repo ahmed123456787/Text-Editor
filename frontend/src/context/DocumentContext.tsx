@@ -20,6 +20,7 @@ interface DocumentState {
   id: string;
   last_update: string;
   collaborators: Collaborator[];
+  version: number; // Add version tracking
 }
 
 interface DocumentContextType {
@@ -33,6 +34,7 @@ interface DocumentContextType {
   setSaved: (saved: boolean) => void;
   selectDocument: (id: string) => void;
   wsConnected: boolean;
+  handleUndo: () => void;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -57,7 +59,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
       try {
         setIsLoading(true);
         const data = await getDocuments();
-
+        console.log("Fetched documents:", data);
         const formattedDocuments = data.map((doc: any) => ({
           content: doc.content || "",
           name: doc.title,
@@ -65,8 +67,9 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
           id: doc.id.toString(),
           last_update: doc.updated_at || "Just now",
           collaborators: doc.collaborators || [{ id: "1", name: "You" }],
+          version: doc.version || 0, // Initialize version
         }));
-
+        console.log("Formatted documents:", formattedDocuments);
         setDocuments(formattedDocuments);
 
         if (formattedDocuments.length > 0) {
@@ -94,16 +97,39 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
       if (data.type === "UPDATE") {
         console.log("hello", data.document.content);
         const updatedContent = data.document.content;
+        const updatedVersion = data.document.version || currentDocument.version;
+
         setDocuments((prevDocs) =>
           prevDocs.map((doc) =>
             doc.id === currentDocument.id
-              ? { ...doc, content: updatedContent }
+              ? { ...doc, content: updatedContent, version: updatedVersion }
               : doc
           )
         );
 
         setCurrentDocument((prevDoc) =>
-          prevDoc ? { ...prevDoc, content: updatedContent } : null
+          prevDoc
+            ? { ...prevDoc, content: updatedContent, version: updatedVersion }
+            : null
+        );
+      }
+      if (data.type == "UNDO") {
+        console.log("Undo request received");
+        const updatedContent = data.document.content;
+        const updatedVersion = data.document.version || currentDocument.version;
+
+        setDocuments((prevDocs) =>
+          prevDocs.map((doc) =>
+            doc.id === currentDocument.id
+              ? { ...doc, content: updatedContent, version: updatedVersion }
+              : doc
+          )
+        );
+
+        setCurrentDocument((prevDoc) =>
+          prevDoc
+            ? { ...prevDoc, content: updatedContent, version: updatedVersion }
+            : null
         );
       }
     });
@@ -135,23 +161,47 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     (content: string) => {
       if (!currentDocument) return;
 
+      const newVersion = currentDocument.version + 1;
+
       const updatedDocuments = documents.map((doc) =>
-        doc.id === currentDocument.id ? { ...doc, content, saved: false } : doc
+        doc.id === currentDocument.id
+          ? { ...doc, content, saved: false, version: newVersion }
+          : doc
       );
 
       setDocuments(updatedDocuments);
-      setCurrentDocument({ ...currentDocument, content, saved: false });
+      setCurrentDocument({
+        ...currentDocument,
+        content,
+        saved: false,
+        version: newVersion,
+      });
 
       if (wsConnected) {
         websocketService.send({
           type: "UPDATE",
           document_id: currentDocument.id,
           content: content,
+          version: newVersion, // Send the new version
         });
       }
     },
     [currentDocument, documents, wsConnected]
   );
+
+  const handleUndo = useCallback(() => {
+    if (!currentDocument || !wsConnected || currentDocument.version <= 0)
+      return;
+
+    websocketService.send({
+      type: "UNDO",
+      document_id: currentDocument.id,
+      content: currentDocument.content,
+      version: currentDocument.version, // Explicitly send the previous version number
+    });
+
+    console.log(`Requesting undo to version ${currentDocument.version - 1}`);
+  }, [currentDocument, wsConnected]);
 
   const setName = useCallback(
     (name: string) => {
@@ -169,6 +219,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
           type: "name_update",
           document_id: currentDocument.id,
           name: name,
+          version: currentDocument.version, // Send the current version
         });
       }
     },
@@ -202,6 +253,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         setSaved,
         selectDocument,
         wsConnected,
+        handleUndo,
       }}
     >
       {children}

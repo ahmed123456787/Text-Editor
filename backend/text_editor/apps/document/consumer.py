@@ -42,12 +42,6 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             self.document_id = self.scope['url_route']['kwargs']['document_id']
             self.room_group_name = f'document_{self.document_id}'
             
-            # Get the document content
-            document = await self.get_document()
-            if not document:
-                await self.close()
-                return
-                
             # Join room group
             await self.channel_layer.group_add(
                 self.room_group_name,
@@ -57,11 +51,32 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             # Accept the connection
             await self.accept()
             
-            # Send document content to the newly connected user
-            await self.send(text_data=json.dumps({
-                'type': 'INITIALIZE',
-                'document': document,
-            }))
+            # Get the document content or the last log
+            last_log = await self.get_last_log()
+            if last_log:
+                # Send the last log to the newly connected user
+                await self.send(text_data=json.dumps({
+                    'type': 'INITIALIZE',
+                    'document': {
+                        'id': str(self.document_id),
+                        'content': last_log['updated_content'],
+                        'version': last_log['version'],
+                    },
+                }))
+            else:
+                # Send the document content to the newly connected user
+                document = await self.get_document()
+                if not document:
+                    await self.close()
+                    return
+                await self.send(text_data=json.dumps({
+                    'type': 'INITIALIZE',
+                    'document': {
+                        'id': str(document['id']),
+                        'content': document['content'],
+                        'version': document['version'],
+                    },
+                }))
             
         except jwt.PyJWTError:
             # Reject connection if token is invalid
@@ -85,31 +100,48 @@ class DocumentConsumer(AsyncWebsocketConsumer):
         if operation_type == 'UPDATE':
             # Process operation of update document content
             position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
-            success = await self.save_operation(self.document_id, opertype, position, changed_content, last_version_log)
+            success = await self.save_operation(self.document_id, opertype, position, data['content'], last_version_log)
             if not success:
                 print(f"Failed to save operation for document_id: {self.document_id}")
                 return
        
-
-        # Build the last version of the document
-        document = await self.get_document()
-        if not document:
-            await self.close()
-            return            
+            # Build the last version of the document
+            document = await self.get_document()
+            if not document:
+                await self.close()
+                return            
         
-        # Send message to room group using the document_update method.
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'document_update',
-                'document': {
-                    'id': str(document['id']),
-                    'content': data['content'],
-                    'version': document['version'],
-                },
-            }
-        )
-    
+            # Send message to room group using the document_update method.
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'document_update',
+                    'document': {
+                        'id': str(document['id']),
+                        'content': data['content'],
+                        'version': document['version'],
+                    },
+                }
+            )
+        
+        elif operation_type == 'UNDO':
+            # Process undo operation
+            document_id = data.get('document_id', self.document_id)
+            version = data.get('version')
+            success, updated_document = await self.perform_undo(document_id, version)
+            if success:
+                await self.send(text_data=json.dumps({
+                    'type': 'UNDO',
+                    'success': True,
+                    'document': updated_document,
+                }))
+            else:
+                await self.send(text_data=json.dumps({
+                    'type': 'UNDO',
+                    'success': False,
+                    'message': 'Nothing to undo',
+                }))
+
     async def document_update(self, event):
         """Handle document_update messages from the channel layer"""
         # Forward the document update to the all connected to this room group
@@ -142,6 +174,22 @@ class DocumentConsumer(AsyncWebsocketConsumer):
         except Document.DoesNotExist:
             return None
     
+    @database_sync_to_async
+    def get_last_log(self):
+        """Get the last operation log for the document"""
+        try:
+            last_log = OperationalLog.objects.filter(document_id=self.document_id).order_by('-version').first()
+            if last_log:
+                return {
+                    'operation': last_log.operation,
+                    'position': last_log.position,
+                    'updated_content': last_log.updated_content,
+                    'version': last_log.version,
+                }
+            return None
+        except Exception as e:
+            print(f"Error fetching last log: {e}")
+            return None
 
     @database_sync_to_async
     def save_operation(self, document_id, operation_type, position, new_content, last_version_log):
@@ -174,3 +222,32 @@ class DocumentConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 print(f"Error saving operation: {e}")
                 return False
+
+    @database_sync_to_async
+    def perform_undo(self, document_id, version):
+        """Perform undo operation by fetching the previous log entry"""
+        try:
+            # Get the document
+            document = Document.objects.get(id=document_id)
+            
+            # Fetch the log entry for the specified version
+            log_entry = OperationalLog.objects.filter(document=document, version=version - 1).first()
+            if not log_entry:
+                print("No previous log entry found for undo")
+                return False, None
+            
+            
+            updated_document = {
+                'id': str(document.id),
+                'title': document.title,
+                'content': log_entry.updated_content,
+                'last_updated': document.updated_at.isoformat(),
+                'version': log_entry.version,
+            }
+            return True, updated_document
+        
+        except Exception as e:
+            print(f"Error performing undo: {e}")
+            import traceback
+            traceback.print_exc()
+            return False, None
