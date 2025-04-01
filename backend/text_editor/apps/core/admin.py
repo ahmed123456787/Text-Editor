@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Document, CustomUser,OperationalLog
+from .models import Document, CustomUser,OperationalLog, DocumentAccessToken
 
 @admin.register(Document)
 class DocumentsAdmin(admin.ModelAdmin):
@@ -26,3 +26,4 @@ class CustomUserAdmin(admin.ModelAdmin):
     )
 
 admin.site.register(OperationalLog)
+admin.site.register(DocumentAccessToken)

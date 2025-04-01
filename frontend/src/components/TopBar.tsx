@@ -1,6 +1,6 @@
 import { Share2, Save } from "lucide-react";
 import { Collaborator } from "../types";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { DocumentContext } from "../context/DocumentContext";
 
 interface TopToolbarProps {
@@ -10,6 +10,7 @@ interface TopToolbarProps {
 
 const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
   const context = useContext(DocumentContext);
+  const [showSaveText, setShowSaveText] = useState(false);
 
   if (!context) {
     throw new Error("DocumentContext is not provided.");
@@ -18,12 +19,13 @@ const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
   const { setName, setSaved } = context;
 
   const handleSave = () => {
-    // In a real app, you'd save to server here
     setSaved(true);
+    setShowSaveText(true);
+    setTimeout(() => setShowSaveText(false), 2000); // Reset save text after 2 seconds
   };
 
   return (
-    <div className="bg-white border-b p-1 flex justify-between items-center">
+    <div className="bg-white border-b pl-4 p-1 flex justify-between items-center">
       <div className="flex items-center">
         <input
           type="text"
@@ -36,7 +38,7 @@ const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
       <div className="flex items-center space-x-4">
         {/* Collaborator Avatars */}
         <div className="flex -space-x-2">
-          {collaborators.map((collaborator) => (
+          {/* {collaborators.map((collaborator) => (
             <div
               key={collaborator.id}
               className="w-4 h-4 rounded-full border-2 border-white"
@@ -46,11 +48,11 @@ const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
               }}
               title={collaborator.name}
             />
-          ))}
+          ))} */}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-2">
           <button className="p-2 hover:bg-gray-100 rounded">
             <Share2 size={20} />
           </button>
@@ -59,6 +61,11 @@ const TopBar = ({ documentTitle, collaborators }: TopToolbarProps) => {
             onClick={handleSave}
           >
             <Save size={20} />
+            {showSaveText ? (
+              <span className="text-green-500">Saved</span>
+            ) : (
+              <span className="text-gray-500">Unsaved</span>
+            )}
           </button>
         </div>
       </div>

@@ -9,7 +9,13 @@ const EditorArea = () => {
     throw new Error("DocumentContext is not provided.");
   }
 
-  const { currentDocument, updateContent, handleUndo, wsConnected } = context;
+  const {
+    currentDocument,
+    updateContent,
+    handleUndo,
+    wsConnected,
+    handleredo,
+  } = context;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -17,6 +23,12 @@ const EditorArea = () => {
         e.preventDefault();
         if (wsConnected && currentDocument) {
           handleUndo();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        if (wsConnected && currentDocument) {
+          handleredo();
         }
       }
     };

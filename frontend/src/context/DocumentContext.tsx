@@ -35,6 +35,7 @@ interface DocumentContextType {
   selectDocument: (id: string) => void;
   wsConnected: boolean;
   handleUndo: () => void;
+  handleredo: () => void;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -61,7 +62,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         const data = await getDocuments();
         console.log("Fetched documents:", data);
         const formattedDocuments = data.map((doc: any) => ({
-          content: doc.content || "",
+          content: "",
           name: doc.title,
           saved: true,
           id: doc.id.toString(),
@@ -73,7 +74,77 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         setDocuments(formattedDocuments);
 
         if (formattedDocuments.length > 0) {
-          setCurrentDocument(formattedDocuments[0]);
+          const initialDocument = formattedDocuments[0];
+          setCurrentDocument(initialDocument);
+
+          // Connect to WebSocket and fetch the latest content
+          websocketService.connect(initialDocument.id);
+          setWsConnected(true);
+
+          const cleanup = websocketService.addMessageHandler((data) => {
+            if (data.type == "INITIALIZE") {
+              const updatedContent = data.document.content;
+              setDocuments((prevDocs) =>
+                prevDocs.map((doc) =>
+                  doc.id === initialDocument.id
+                    ? {
+                        ...doc,
+                        content: updatedContent,
+                      }
+                    : doc
+                )
+              );
+
+              setCurrentDocument((prevDoc) =>
+                prevDoc
+                  ? {
+                      ...prevDoc,
+                      content: updatedContent,
+                    }
+                  : null
+              );
+            }
+            if (
+              data.type === "UPDATE" &&
+              data.document.id === initialDocument.id
+            ) {
+              console.log(
+                "WebSocket initial content received:",
+                data.document.content
+              );
+              const updatedContent = data.document.content;
+              const updatedVersion =
+                data.document.version || initialDocument.version;
+
+              setDocuments((prevDocs) =>
+                prevDocs.map((doc) =>
+                  doc.id === initialDocument.id
+                    ? {
+                        ...doc,
+                        content: updatedContent,
+                        version: updatedVersion,
+                      }
+                    : doc
+                )
+              );
+
+              setCurrentDocument((prevDoc) =>
+                prevDoc
+                  ? {
+                      ...prevDoc,
+                      content: updatedContent,
+                      version: updatedVersion,
+                    }
+                  : null
+              );
+            }
+          });
+
+          return () => {
+            cleanup();
+            websocketService.disconnect();
+            setWsConnected(false);
+          };
         }
       } catch (err) {
         console.error("Failed to fetch documents:", err);
@@ -91,46 +162,41 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
 
     websocketService.connect(currentDocument.id);
     setWsConnected(true);
+    const updateDocuments = (updateContent: any, updatedVersion: any) => {
+      setDocuments((prevDocs) =>
+        prevDocs.map((doc) =>
+          doc.id === currentDocument.id
+            ? { ...doc, content: updateContent, version: updatedVersion }
+            : doc
+        )
+      );
 
+      setCurrentDocument((prevDoc) =>
+        prevDoc
+          ? { ...prevDoc, content: updateContent, version: updatedVersion }
+          : null
+      );
+    };
     const cleanup = websocketService.addMessageHandler((data) => {
       console.log("WebSocket message received:", data);
       if (data.type === "UPDATE") {
         console.log("hello", data.document.content);
         const updatedContent = data.document.content;
         const updatedVersion = data.document.version || currentDocument.version;
-
-        setDocuments((prevDocs) =>
-          prevDocs.map((doc) =>
-            doc.id === currentDocument.id
-              ? { ...doc, content: updatedContent, version: updatedVersion }
-              : doc
-          )
-        );
-
-        setCurrentDocument((prevDoc) =>
-          prevDoc
-            ? { ...prevDoc, content: updatedContent, version: updatedVersion }
-            : null
-        );
+        updateDocuments(updatedContent, updatedVersion);
       }
       if (data.type == "UNDO") {
         console.log("Undo request received");
         const updatedContent = data.document.content;
         const updatedVersion = data.document.version || currentDocument.version;
+        updateDocuments(updatedContent, updatedVersion);
+      }
+      if (data.type == "REDO") {
+        console.log("Redo request received");
+        const updatedContent = data.document.content;
+        const updatedVersion = data.document.version || currentDocument.version;
 
-        setDocuments((prevDocs) =>
-          prevDocs.map((doc) =>
-            doc.id === currentDocument.id
-              ? { ...doc, content: updatedContent, version: updatedVersion }
-              : doc
-          )
-        );
-
-        setCurrentDocument((prevDoc) =>
-          prevDoc
-            ? { ...prevDoc, content: updatedContent, version: updatedVersion }
-            : null
-        );
+        updateDocuments(updatedContent, updatedVersion);
       }
     });
 
@@ -203,6 +269,19 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     console.log(`Requesting undo to version ${currentDocument.version - 1}`);
   }, [currentDocument, wsConnected]);
 
+  const handleredo = useCallback(() => {
+    if (!currentDocument || !wsConnected) return;
+
+    websocketService.send({
+      type: "REDO",
+      document_id: currentDocument.id,
+      content: currentDocument.content,
+      version: currentDocument.version, // Explicitly send the previous version number
+    });
+
+    console.log(`Requesting redo to version ${currentDocument.version + 1}`);
+  }, [currentDocument, documents, wsConnected]);
+
   const setName = useCallback(
     (name: string) => {
       if (!currentDocument) return;
@@ -254,6 +333,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         selectDocument,
         wsConnected,
         handleUndo,
+        handleredo,
       }}
     >
       {children}
