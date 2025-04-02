@@ -4,60 +4,58 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 import jwt
 from django.conf import settings
-from text_editor.apps.core.models import Document, OperationalLog
+from text_editor.apps.core.models import Document, OperationalLog, DocumentAccessToken
 from django.db import transaction
 from .utils import get_position_of_change_async
 from django.utils.timesince import timesince
 from django.utils.timezone import now
 from abc import ABC, abstractmethod
+from enum import Enum  # Add import for Enum
 
 
 User = get_user_model()
 
 
+class UserRole(Enum):
+    GUEST = "guest"
+    READER = "reader"
+    WRITER = "writer"
+
+
 class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
+    role = None
+
     @abstractmethod
     async def connect(self):
         pass
-    
+
     @abstractmethod
     async def receive(self, text_data):
         pass
-    
+
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
         )
-    
+
     async def document_update(self, event):
         await self.send(text_data=json.dumps({
             'type': 'UPDATE',
             'document': event['document'],
         }))
-    
+
+    @abstractmethod
     async def authenticate_user(self):
-        query_string = self.scope.get('query_string', b'').decode('utf-8')
-        query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
-        token = query_params.get('token')
-        
-        if not token:
-            return None
-        
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            user_id = payload.get('user_id')
-            return await self.get_user(user_id)
-        except jwt.PyJWTError:
-            return None
-    
+        pass
+
     @database_sync_to_async
     def get_user(self, user_id):
         try:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             return None
-    
+
     @database_sync_to_async
     def get_document(self, document_id):
         try:
@@ -71,6 +69,7 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
             }
         except Document.DoesNotExist:
             return None
+
     @database_sync_to_async
     def get_last_log(self):
         """Get the last operation log for the document"""
@@ -87,20 +86,20 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
         except Exception as e:
             print(f"Error fetching last log: {e}")
             return None
-        
+
     @database_sync_to_async
     def perform_undo(self, document_id, version):
         """Perform undo operation by fetching the previous log entry"""
         try:
             # Get the document
             document = Document.objects.get(id=document_id)
-            
+
             # Fetch the log entry for the specified version
             log_entry = OperationalLog.objects.filter(document=document, version=version - 1).first()
             if not log_entry:
                 print("No previous log entry found for undo")
                 return False, None
-            
+
             # Ensure `updated_at` is a datetime object and calculate human-readable time
             last_updated_human = timesince(document.updated_at, now()) + " ago"
             updated_document = {
@@ -111,7 +110,7 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
                 'version': log_entry.version,
             }
             return True, updated_document
-        
+
         except Exception as e:
             print(f"Error performing undo: {e}")
             import traceback
@@ -124,13 +123,13 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
         try:
             # Get the document
             document = Document.objects.get(id=document_id)
-            
+
             # Fetch the log entry for the specified version
             log_entry = OperationalLog.objects.filter(document=document, version=version + 1).first()
             if not log_entry:
                 print("No next log entry found for redo")
                 return False, None
-            
+
             # Ensure `updated_at` is a datetime object and calculate human-readable time
             last_updated_human = timesince(document.updated_at, now()) + " ago"
             updated_document = {
@@ -141,57 +140,57 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
                 'version': log_entry.version,
             }
             return True, updated_document
-        
+
         except Exception as e:
             print(f"Error performing redo: {e}")
             import traceback
             traceback.print_exc()
             return False, None
-        
-
 
 
 class DocumentConsumer(BaseDocumentConsumer):
+    role = UserRole.WRITER  # Define role as WRITER (Owner)
+
     async def connect(self):
         """Handle new WebSocket connection with token authentication"""
         # Extract token from query string
         query_string = self.scope.get('query_string', b'').decode('utf-8')
         query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
         token = query_params.get('token', None)
-        
+
         if not token:
             # Reject connection if no token provided
             await self.close()
             return
-        
+
         try:
             # Verify JWT token
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             user_id = payload.get('user_id')
-            
+
             if not user_id:
                 await self.close()
                 return
-            
+
             # Authenticate user
             self.user = await self.get_user(user_id)
             if not self.user:
                 await self.close()
                 return
-            
+
             # Get document ID from URL route
             self.document_id = self.scope['url_route']['kwargs']['document_id']
             self.room_group_name = f'document_{self.document_id}'
-            
+
             # Join room group
             await self.channel_layer.group_add(
                 self.room_group_name,
                 self.channel_name
             )
-            
+
             # Accept the connection
             await self.accept()
-            
+
             # Get the document content or the last log
             last_log = await self.get_last_log()
             if last_log:
@@ -218,11 +217,26 @@ class DocumentConsumer(BaseDocumentConsumer):
                         'version': document['version'],
                     },
                 }))
-            
+
         except jwt.PyJWTError:
             # Reject connection if token is invalid
             await self.close()
-    
+
+    async def authenticate_user(self):
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
+        token = query_params.get('token')
+
+        if not token:
+            return None
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user_id = payload.get('user_id')
+            return await self.get_user(user_id)
+        except jwt.PyJWTError:
+            return None
+
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection"""
         # Leave room group
@@ -233,11 +247,15 @@ class DocumentConsumer(BaseDocumentConsumer):
 
     async def receive(self, text_data):
         """Handle messages received from WebSocket Client"""
+        if self.role != UserRole.WRITER:
+            await self.send(text_data=json.dumps({'error': 'Permission denied'}))
+            return
+
         data = json.loads(text_data)
         print("Received data:", data)
-        
+
         operation_type = data.get('type')
-        
+
         if operation_type == 'UPDATE':
             # Process operation of update document content
             position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
@@ -245,13 +263,13 @@ class DocumentConsumer(BaseDocumentConsumer):
             if not success:
                 print(f"Failed to save operation for document_id: {self.document_id}")
                 return
-       
+
             # Build the last version of the document
-            document = await self.get_document()
+            document = await self.get_document(self.document_id)
             if not document:
                 await self.close()
-                return            
-        
+                return
+
             # Send message to room group using the document_update method.
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -264,7 +282,7 @@ class DocumentConsumer(BaseDocumentConsumer):
                     },
                 }
             )
-        
+
         elif operation_type == 'UNDO':
             # Process undo operation
             document_id = data.get('document_id', self.document_id)
@@ -282,7 +300,7 @@ class DocumentConsumer(BaseDocumentConsumer):
                     'success': False,
                     'message': 'Nothing to undo',
                 }))
-        
+
         elif operation_type == 'REDO':
             # Process redo operation
             document_id = data.get('document_id', self.document_id)
@@ -309,7 +327,7 @@ class DocumentConsumer(BaseDocumentConsumer):
             try:
                 # Get the document
                 document = Document.objects.get(id=document_id)
-                
+
                 # Create operation log
                 OperationalLog.objects.create(
                     document_id=document_id,
@@ -318,40 +336,99 @@ class DocumentConsumer(BaseDocumentConsumer):
                     version=last_version_log + 1,
                     updated_content=new_content,
                 )
-                
+
                 # Update document content every 50 versions
                 if last_version_log % 50 == 0:
                     # Update document with new content
                     document.content = new_content
-                
+
                 # Increment document version
                 document.current_version += 1
                 document.save()
-                
+
                 return True
             except Exception as e:
                 print(f"Error saving operation: {e}")
                 return False
 
 
-
 class GuestDocumentConsumer(BaseDocumentConsumer):
+    role = None  # Role will be determined based on the token
+
     async def connect(self):
-        self.user = await self.authenticate_user()
-        if not self.user:
+        """Handle new WebSocket connection with token-based permissions"""
+        self.user, self.role = await self.authenticate_user()
+        if not self.user or not self.role:
             await self.close()
             return
-        
+
         self.document_id = self.scope['url_route']['kwargs']['document_id']
         self.room_group_name = f'document_{self.document_id}'
+
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-        
+
         document = await self.get_document(self.document_id)
         if document:
             await self.send(text_data=json.dumps({'type': 'INITIALIZE', 'document': document}))
         else:
             await self.close()
-    
+
+    async def authenticate_user(self):
+        """Authenticate user and determine role based on token"""
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
+        token = query_params.get('token')
+
+        if not token:
+            return None, None
+
+        try:
+            doc_token = DocumentAccessToken.objects.get(token=token)
+            if doc_token.permission == "write":
+                return doc_token.document.user, UserRole.WRITER
+            elif doc_token.permission == "read":
+                return doc_token.document.user, UserRole.READER
+            return None, None
+        except DocumentAccessToken.DoesNotExist:
+            return None, None
+
     async def receive(self, text_data):
-        await self.send(text_data=json.dumps({'error': 'Permission denied'}))
+        """Handle messages received from WebSocket Client"""
+        if self.role == UserRole.READER:
+            await self.send(text_data=json.dumps({'error': 'Permission denied: Read-only access'}))
+            return
+
+        if self.role == UserRole.WRITER:
+            data = json.loads(text_data)
+            operation_type = data.get('type')
+
+            if operation_type == 'UPDATE':
+                position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
+                success = await self.save_operation(self.document_id, opertype, position, data['content'], last_version_log)
+                if not success:
+                    return
+
+                document = await self.get_document(self.document_id)
+                if not document:
+                    await self.close()
+                    return
+
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'document_update',
+                        'document': {
+                            'id': str(document['id']),
+                            'content': data['content'],
+                            'version': document['version'],
+                        },
+                    }
+                )
+
+    async def document_update(self, event):
+        """Handle document updates and broadcast to all connected users"""
+        await self.send(text_data=json.dumps({
+            'type': 'UPDATE',
+            'document': event['document'],
+        }))

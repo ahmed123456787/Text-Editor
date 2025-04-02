@@ -78,10 +78,7 @@ const CollaborativeTextEditor = () => {
       {/* Main Editor Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Toolbar */}
-        <TopBar
-          documentTitle={currentDocument.name}
-          collaborators={collaborators}
-        />
+        <TopBar documentTitle={currentDocument.name} />
 
         {/* Editor and Collaboration Panel */}
         <div className="flex flex-1">
