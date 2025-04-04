@@ -1,6 +1,9 @@
-import React from "react";
+import { useContext } from "react";
+import { ThemeContext } from "../../context/ThemeContext"; // Import ThemeContext
 
 const Footer = () => {
+  const { darkMode } = useContext(ThemeContext); // Consume ThemeContext
+
   return (
     <footer
       className={`py-4 px-6 ${

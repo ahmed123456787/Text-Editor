@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import CollaborativeTextEditor from "./components/TextEditor";
+// import CollaborativeTextEditor from "./components/TextEditor";
 import DocumentViewer from "./components/DocumentViewer";
 import { DocumentProvider } from "./context/DocumentContext";
-import ThemeProvider from "./context/ThemeContext"; // Import ThemeProvider
+import ThemeProvider from "./context/ThemeContext";
 import HomePage from "./pages/HomePage";
 
 function App() {

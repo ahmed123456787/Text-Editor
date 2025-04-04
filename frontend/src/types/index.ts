@@ -13,3 +13,12 @@ export interface Document {
   name: string;
   lastEdited: string;
 }
+
+export interface Document {
+  id: number;
+  title: string;
+  content: string;
+  last_updated: string;
+  version: number;
+  starred: boolean | true;
+}

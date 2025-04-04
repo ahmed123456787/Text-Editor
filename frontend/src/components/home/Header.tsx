@@ -7,12 +7,12 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
+import { useContext } from "react";
+import { ThemeContext } from "../../context/ThemeContext"; // Import ThemeContext
 
-type HeaderProps = {
-  darkMode: boolean;
-  toggleDarkMode: () => void;
-};
-const Header = ({ darkMode, toggleDarkMode }: HeaderProps) => {
+const Header = () => {
+  const { darkMode, toggleDarkMode } = useContext(ThemeContext); // Consume ThemeContext
+
   return (
     <header
       className={`sticky top-0 z-10 ${
