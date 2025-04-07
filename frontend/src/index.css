@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+/* Common CSS classes for theming */
+.bgAndBorder {
+  @apply bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700;
+}
+
+.textSecondary {
+  @apply text-gray-500 dark:text-gray-400;
+}
+
+.primaryBg {
+  @apply bg-white dark:bg-gray-800;
+}
+
+.secondaryBg {
+  @apply bg-gray-50 dark:bg-gray-900;
+}
+
+.tertiaryBg {
+  @apply bg-gray-100 dark:bg-gray-750;
+}
+
+.primaryText {
+  @apply text-gray-900 dark:text-white;
+}
+
+.secondaryText {
+  @apply text-gray-600 dark:text-gray-300;
+}
+
+.primaryButton {
+  @apply bg-blue-600 hover:bg-blue-700 text-white;
+}
+
+.secondaryButton {
+  @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200;
+}
+
+.outlineButton {
+  @apply border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700;
+}
+
+.cardBg {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+.inputField {
+  @apply border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white;
+}

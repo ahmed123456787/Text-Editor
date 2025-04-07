@@ -3,8 +3,8 @@ import { apis } from "./init";
 export type PermissionType = "read" | "write" | ["read", "write"];
 
 export const getDocuments = async () => {
-  const { data } = await apis.get("/documents");
-  return data;
+  const response = await apis.get("/documents");
+  return response;
 };
 
 export const getDocumentAccessToken = async (
