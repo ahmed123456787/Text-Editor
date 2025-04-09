@@ -393,13 +393,13 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
         """Authenticate user and determine role based on token"""
         query_string = self.scope.get('query_string', b'').decode('utf-8')
         query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
-        token = query_params.get('token')
-
-        if not token:
+        sharedId = query_params.get('sharedId')
+        print("hello from the shared ")
+        if not sharedId:
             return None, None
 
         try:
-            doc_token = DocumentAccessToken.objects.get(token=token)
+            doc_token = DocumentAccessToken.objects.get(shared_id=sharedId)
             if doc_token.permission == "write":
                 return doc_token.document.user, UserRole.WRITER
             elif doc_token.permission == "read":

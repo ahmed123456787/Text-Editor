@@ -96,7 +96,7 @@ class DocumentAccessToken(models.Model):
         ('write', 'Write'),
     )
     document = models.OneToOneField(Document, on_delete=models.CASCADE)
-    token = models.UUIDField(max_length=255)
+    shared_id = models.CharField(max_length=10, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     permissions = MultiSelectField(choices=PERMISSIONS)  # Allow multiple selections
 

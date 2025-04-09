@@ -69,14 +69,16 @@ class DocumentAccessTokenView(GenericAPIView):
             # Delete any existing token for the document
             DocumentAccessToken.objects.filter(document=document).delete()
             
+            short_id = str(uuid4())[:6]
+
             # Create a new token for the document
             token_entry = DocumentAccessToken.objects.create(
                 document=document,
-                token=uuid4(),
+                shared_id=short_id,
                 permissions=serializer.validated_data.get("permissions"),  # Use validated permissions
             )
             
             # Return the newly created token
-            return Response({"token": str(token_entry.token)}, status=status.HTTP_200_OK)
+            return Response({"sharedId": str(token_entry.shared_id)}, status=status.HTTP_200_OK)
         except Document.DoesNotExist:
             return Response({"detail": "Document not found."}, status=status.HTTP_404_NOT_FOUND)

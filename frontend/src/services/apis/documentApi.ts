@@ -14,6 +14,6 @@ export const getDocumentAccessToken = async (
   const { data } = await apis.post(`documents/shared/${documentId}/`, {
     permissions,
   });
-  console.log(data.token);
-  return data.token;
+  console.log(data.sharedId);
+  return data.sharedId;
 };

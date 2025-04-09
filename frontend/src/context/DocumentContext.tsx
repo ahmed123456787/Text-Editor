@@ -71,7 +71,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
           setCurrentDocument(initialDocument);
 
           // Connect to WebSocket and fetch the latest content
-          websocketService.connect(initialDocument.id);
+          websocketService.connectOwner(initialDocument.id);
           setWsConnected(true);
 
           const cleanup = websocketService.addMessageHandler((data) => {
@@ -153,7 +153,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   useEffect(() => {
     if (!currentDocument) return;
 
-    websocketService.connect(currentDocument.id);
+    websocketService.connectOwner(currentDocument.id);
     setWsConnected(true);
     const updateDocuments = (updateContent: any, updatedVersion: any) => {
       setDocuments((prevDocs) =>

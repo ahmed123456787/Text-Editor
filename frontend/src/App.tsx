@@ -9,6 +9,7 @@ import SignupPage from "./pages/SignupPage";
 import { useContext, useEffect } from "react";
 import { ThemeContext } from "./context/ThemeContext";
 import { CookiesProvider } from "react-cookie";
+import TextViewer from "./pages/TextViewer";
 
 const AppRoutes = () => {
   const { darkMode } = useContext(ThemeContext);
@@ -40,6 +41,14 @@ const AppRoutes = () => {
           element={
             <DocumentProvider>
               <TextEditor />
+            </DocumentProvider>
+          }
+        />
+        <Route
+          path="/document/shared/:id"
+          element={
+            <DocumentProvider>
+              <TextViewer />
             </DocumentProvider>
           }
         />

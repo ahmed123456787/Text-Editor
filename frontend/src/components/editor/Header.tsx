@@ -70,11 +70,8 @@ const Header = ({
   const getLinkToDocument = async () => {
     setIsLoading(true);
     try {
-      const accessToken = await getDocumentAccessToken(
-        document.id,
-        permissions
-      );
-      const link = `${window.location.origin}/document/${document.id}?access_token=${accessToken}`;
+      const sharedId = await getDocumentAccessToken(document.id, permissions);
+      const link = `${window.location.origin}/document/shared/${sharedId}`;
       setShareLink(link);
     } catch (error) {
       console.error("Error generating share link:", error);
