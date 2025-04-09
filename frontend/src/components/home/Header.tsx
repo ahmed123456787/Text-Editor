@@ -15,13 +15,12 @@ import { DocumentState } from "@/types";
 
 interface HeaderProps {
   documents: DocumentState[];
-  setDocuments: React.Dispatch<React.SetStateAction<DocumentState[]>>;
 }
 
-const Header = ({ documents, setDocuments }: HeaderProps) => {
+const Header = ({ documents }: HeaderProps) => {
+  const [searchValue, setSearchValue] = useState("");
   const { darkMode, toggleDarkMode } = useContext(ThemeContext);
   const context = useContext(DocumentContext);
-  const [searchValue, setSearchValue] = useState("");
 
   if (!context) {
     throw new Error("Header must be used within a DocumentProvider");
@@ -41,7 +40,7 @@ const Header = ({ documents, setDocuments }: HeaderProps) => {
 
   const resetSearch = () => {
     setSearchValue("");
-    setFilteredDocuments([]); // Reset filtered documents to empty array
+    setFilteredDocuments([]); // Reset filtered documents to empty array ( reset all documents )
   };
 
   return (

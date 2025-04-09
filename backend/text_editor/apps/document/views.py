@@ -55,7 +55,6 @@ class DocumentAccessTokenView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    
 
     def post(self, request, document_id):
         try:

@@ -44,7 +44,7 @@ export default function HomePage() {
   return (
     <div className={`min-h-screen flex flex-col ${mainBg} ${textColor}`}>
       {/* Header */}
-      <Header documents={documents} setDocuments={setDocuments} />
+      <Header documents={documents} />
       {/* Main content */}
       <main className="flex-grow px-4 py-6 max-w-6xl mx-auto w-full">
         <DocumentHeader viewMode={viewMode} setViewMode={setViewMode} />

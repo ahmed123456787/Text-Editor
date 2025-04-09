@@ -8,7 +8,7 @@ export interface DocumentState {
   title: string;
   saved: boolean;
   id: string;
-  last_updated: string;
+  last_update: string;
   collaborators: Collaborator[];
   version: number; // Add version tracking
 }

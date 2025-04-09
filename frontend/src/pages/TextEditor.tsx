@@ -97,17 +97,17 @@ export default function TextEditor() {
   return (
     <div className="flex flex-col h-screen">
       {/* Top Navigation Bar */}
-      <Header
-        documentTitle={currentDocument?.title || "Untitled Document"}
-        isStarred={isStarred}
-        setDocumentTitle={(title) => {
-          if (currentDocument) {
+      {currentDocument && (
+        <Header
+          document={currentDocument}
+          isStarred={isStarred}
+          setDocumentTitle={(title) => {
             currentDocument.title = title;
-          }
-          setContent(title);
-        }}
-        setIsStarred={setIsStarred}
-      />
+            setContent(title);
+          }}
+          setIsStarred={setIsStarred}
+        />
+      )}
       {/* Toolbar */}
       <TopBar />
       {/* Main Content Area */}

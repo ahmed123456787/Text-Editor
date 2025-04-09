@@ -22,7 +22,7 @@ const RecentDocuments = ({
   const { documents, filteredDocuments } = context;
   const textSecondary = getTextSecondary(darkMode);
 
-  // Use filteredDocuments if they exist, otherwise fall back to regular documents
+  // Use filteredDocuments in case of release the search
   const displayDocuments =
     filteredDocuments && filteredDocuments.length > 0
       ? filteredDocuments

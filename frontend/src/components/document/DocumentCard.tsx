@@ -18,7 +18,7 @@ const DocumentCard = ({ doc }: DocumentCardProps) => {
     throw new Error("DocumentContext is not provided.");
   }
   const { setCurrentDocument } = context;
-
+  console.log(doc, "def");
   // Create a theme class mapping object to avoid direct conditionals in JSX
   const theme = {
     card: darkMode
@@ -51,7 +51,7 @@ const DocumentCard = ({ doc }: DocumentCardProps) => {
         </div>
         <div className={`text-xs mt-1 flex items-center ${theme.metadata}`}>
           <File className="h-3 w-3 mr-1" />
-          <span>Edited {doc.last_updated}</span>
+          <span>Edited {doc.last_update}</span>
         </div>
       </div>
     </div>
