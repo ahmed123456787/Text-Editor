@@ -34,10 +34,12 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
         pass
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        """Handle WebSocket disconnection"""
+        if self.room_group_name:  # Simply check if it's not None
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
 
     async def document_update(self, event):
         await self.send(text_data=json.dumps({
@@ -148,6 +150,7 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
             return False, None
 
 
+
 class DocumentConsumer(BaseDocumentConsumer):
     role = UserRole.WRITER  # Define role as WRITER (Owner)
 
@@ -155,9 +158,10 @@ class DocumentConsumer(BaseDocumentConsumer):
         """Handle new WebSocket connection with token authentication"""
         # Extract token from query string
         query_string = self.scope.get('query_string', b'').decode('utf-8')
+        print(f"Query params: {query_string}")
         query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
         token = query_params.get('token', None)
-
+        print(f"Token: {token}")
         if not token:
             # Reject connection if no token provided
             await self.close()
@@ -166,21 +170,30 @@ class DocumentConsumer(BaseDocumentConsumer):
         try:
             # Verify JWT token
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            print(f"Payload: {payload}")
             user_id = payload.get('user_id')
-
+            print(f"User ID: {user_id}")
             if not user_id:
                 await self.close()
                 return
 
             # Authenticate user
             self.user = await self.get_user(user_id)
+            print(f"User: {self.user}")
             if not self.user:
                 await self.close()
                 return
 
             # Get document ID from URL route
-            self.document_id = self.scope['url_route']['kwargs']['document_id']
+            self.document_id = self.scope['url_route']['kwargs'].get('document_id')
+            if not self.document_id:
+                print("Document ID not found in URL route")
+                await self.close()
+                return
+
+            # Initialize room group name
             self.room_group_name = f'document_{self.document_id}'
+            print(f"Room group name: {self.room_group_name}")
 
             # Join room group
             await self.channel_layer.group_add(
@@ -218,9 +231,11 @@ class DocumentConsumer(BaseDocumentConsumer):
                     },
                 }))
 
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as e:
             # Reject connection if token is invalid
+            print("Invalid token", e)
             await self.close()
+            
 
     async def authenticate_user(self):
         query_string = self.scope.get('query_string', b'').decode('utf-8')

@@ -95,7 +95,17 @@ class WebSocketService {
   }
 
   private getAuthToken(): string {
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDI3OTY0LCJpYXQiOjE3NDQwMjQzNjQsImp0aSI6ImM3OGE5YTZjZTYxZjQwNDRiOTQ4NmQ5NmVhYTg2MjUzIiwidXNlcl9pZCI6MX0.YYEtcVA5uxf_sXWqXTb2s9Nqso2a433GYl8nAoeIUQU";
+    const tokenCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("token="));
+
+    if (!tokenCookie) {
+      console.warn("Auth token not found in cookies");
+      return "";
+    }
+
+    // Extract only the token value, removing the "token=" prefix
+    return tokenCookie.substring(6); // "token=".length === 6
   }
 
   private setupSocketEventHandlers(documentId: string): void {

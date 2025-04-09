@@ -5,11 +5,11 @@ export const ThemeContext = createContext({
   toggleDarkMode: () => {},
 });
 
-export default function ThemeProvider({
-  children,
-}: {
+interface ThemeProviderProps {
   children: React.ReactNode;
-}) {
+}
+
+export default function ThemeProvider({ children }: ThemeProviderProps) {
   const [darkMode, setDarkMode] = useState(false);
 
   const toggleDarkMode = () => {

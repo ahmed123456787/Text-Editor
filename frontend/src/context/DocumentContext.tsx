@@ -7,25 +7,13 @@ import {
 } from "react";
 import { getDocuments } from "../services/apis/documentApi";
 import { websocketService } from "../services/websocket";
-
-interface Collaborator {
-  id: string;
-  name: string;
-}
-
-interface DocumentState {
-  content: string;
-  name: string;
-  saved: boolean;
-  id: string;
-  last_update: string;
-  collaborators: Collaborator[];
-  version: number; // Add version tracking
-}
+import { DocumentState } from "../types/index";
 
 interface DocumentContextType {
   documents: DocumentState[];
   currentDocument: DocumentState | null;
+  filteredDocuments: DocumentState[];
+  setFilteredDocuments: React.Dispatch<React.SetStateAction<DocumentState[]>>;
   isLoading: boolean;
   error: string | null;
   setDocuments: React.Dispatch<React.SetStateAction<DocumentState[]>>;
@@ -36,6 +24,9 @@ interface DocumentContextType {
   wsConnected: boolean;
   handleUndo: () => void;
   handleredo: () => void;
+  setCurrentDocument: React.Dispatch<
+    React.SetStateAction<DocumentState | null>
+  >;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -51,6 +42,9 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   const [currentDocument, setCurrentDocument] = useState<DocumentState | null>(
     null
   );
+  const [filteredDocuments, setFilteredDocuments] = useState<DocumentState[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -59,18 +53,17 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     const fetchDocuments = async () => {
       try {
         setIsLoading(true);
-        const data = await getDocuments();
-        console.log("Fetched documents:", data);
-        const formattedDocuments = data.map((doc: any) => ({
+        const documents = await getDocuments();
+        console.log("Fetched documents:", documents);
+        const formattedDocuments = documents.map((doc: any) => ({
           content: "",
-          name: doc.title,
+          title: doc.title,
           saved: true,
           id: doc.id.toString(),
           last_update: doc.updated_at || "Just now",
           collaborators: doc.collaborators || [{ id: "1", name: "You" }],
           version: doc.version || 0, // Initialize version
         }));
-        console.log("Formatted documents:", formattedDocuments);
         setDocuments(formattedDocuments);
 
         if (formattedDocuments.length > 0) {
@@ -178,7 +171,6 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
       );
     };
     const cleanup = websocketService.addMessageHandler((data) => {
-      console.log("WebSocket message received:", data);
       if (data.type === "UPDATE") {
         console.log("hello", data.document.content);
         const updatedContent = data.document.content;
@@ -291,7 +283,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
       );
 
       setDocuments(updatedDocuments);
-      setCurrentDocument({ ...currentDocument, name });
+      setCurrentDocument({ ...currentDocument, title: name });
 
       if (wsConnected) {
         websocketService.send({
@@ -331,9 +323,12 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         setName,
         setSaved,
         selectDocument,
+        setCurrentDocument,
         wsConnected,
         handleUndo,
         handleredo,
+        filteredDocuments,
+        setFilteredDocuments,
       }}
     >
       {children}

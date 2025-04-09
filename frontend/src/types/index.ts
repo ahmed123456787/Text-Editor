@@ -1,24 +1,14 @@
-export interface Collaborator {
-  id: number;
+interface Collaborator {
+  id: string;
   name: string;
-  color: string;
-  cursor: {
-    x: number;
-    y: number;
-  };
 }
 
-export interface Document {
-  id: number;
-  name: string;
-  lastEdited: string;
-}
-
-export interface Document {
-  id: number;
-  title: string;
+export interface DocumentState {
   content: string;
+  title: string;
+  saved: boolean;
+  id: string;
   last_updated: string;
-  version: number;
-  starred: boolean | true;
+  collaborators: Collaborator[];
+  version: number; // Add version tracking
 }

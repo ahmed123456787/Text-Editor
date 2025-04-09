@@ -3,16 +3,16 @@ import Header from "../components/home/Header";
 import Footer from "../components/home/Footer";
 import { ThemeContext } from "../context/ThemeContext";
 import { getDocuments } from "../services/apis/documentApi";
-import { Document } from "../types/index";
 import DocumentCreation from "../components/document/DocumentCreation";
 import DocumentHeader from "../components/document/DocumentHeader";
-import RecentDocumentsSection from "../components/document/RecentDocumentsSection";
-import DocumentShared from "../components/document/DocumentShared";
+import RecentDocuments from "../components/document/RecentDocument";
+import SharedDocument from "../components/document/SharedDocument";
+import { DocumentState } from "../types/index";
 
 export default function HomePage() {
   const [viewMode, setViewMode] = useState("grid");
   const { darkMode } = useContext(ThemeContext);
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Dynamic classes based on dark mode state
@@ -23,8 +23,8 @@ export default function HomePage() {
     const fetchDocuments = async () => {
       try {
         setIsLoading(true);
-        const response = await getDocuments();
-        setDocuments(response.data);
+        const documents = await getDocuments();
+        setDocuments(documents);
       } catch (error) {
         console.error("Error fetching documents:", error);
       } finally {
@@ -35,14 +35,6 @@ export default function HomePage() {
     fetchDocuments();
   }, []);
 
-  const recentDocuments = [
-    { id: 1, title: "Project Proposal", editedAt: "Apr 2", starred: true },
-    { id: 2, title: "Meeting Notes", editedAt: "Apr 1", starred: false },
-    { id: 3, title: "Quarterly Report", editedAt: "Mar 28", starred: false },
-    { id: 4, title: "Marketing Strategy", editedAt: "Mar 25", starred: true },
-    { id: 5, title: "Product Roadmap", editedAt: "Mar 22", starred: false },
-  ];
-
   const sharedDocuments = [
     { id: 6, title: "Team Budget", sharedAt: "Mar 30", owner: "Sarah K." },
     { id: 7, title: "Project Timeline", sharedAt: "Mar 18", owner: "Mike T." },
@@ -52,18 +44,13 @@ export default function HomePage() {
   return (
     <div className={`min-h-screen flex flex-col ${mainBg} ${textColor}`}>
       {/* Header */}
-      <Header />
+      <Header documents={documents} setDocuments={setDocuments} />
       {/* Main content */}
       <main className="flex-grow px-4 py-6 max-w-6xl mx-auto w-full">
         <DocumentHeader viewMode={viewMode} setViewMode={setViewMode} />
         <DocumentCreation />
-        <RecentDocumentsSection
-          viewMode={viewMode}
-          documents={documents}
-          recentDocuments={recentDocuments}
-          isLoading={isLoading}
-        />
-        <DocumentShared viewMode={viewMode} sharedDocuments={sharedDocuments} />
+        <RecentDocuments viewMode={viewMode} isLoading={isLoading} />
+        <SharedDocument viewMode={viewMode} sharedDocuments={sharedDocuments} />
       </main>
       {/* Footer */}
       <Footer />

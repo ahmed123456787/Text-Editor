@@ -1,10 +1,10 @@
 import { apis } from "./init";
-
 export type PermissionType = "read" | "write" | ["read", "write"];
 
 export const getDocuments = async () => {
-  const response = await apis.get("/documents");
-  return response;
+  const { data } = await apis.get("/documents");
+  console.log("Documents", data);
+  return data;
 };
 
 export const getDocumentAccessToken = async (

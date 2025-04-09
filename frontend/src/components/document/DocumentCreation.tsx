@@ -2,7 +2,6 @@ import { useContext } from "react";
 import { Plus } from "lucide-react";
 import { ThemeContext } from "../../context/ThemeContext";
 
-// Common CSS classes for theming
 const getBgAndBorder = (darkMode: boolean) =>
   darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
 

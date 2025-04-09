@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import DocumentViewer from "./components/DocumentViewer";
+import TextEditor from "./pages/TextEditor";
 import { DocumentProvider } from "./context/DocumentContext";
 import ThemeProvider from "./context/ThemeContext";
 import HomePage from "./pages/HomePage";
@@ -8,6 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import { useContext, useEffect } from "react";
 import { ThemeContext } from "./context/ThemeContext";
+import { CookiesProvider } from "react-cookie";
 
 const AppRoutes = () => {
   const { darkMode } = useContext(ThemeContext);
@@ -38,7 +39,7 @@ const AppRoutes = () => {
           path="/document/:id"
           element={
             <DocumentProvider>
-              <DocumentViewer />
+              <TextEditor />
             </DocumentProvider>
           }
         />
@@ -49,9 +50,11 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppRoutes />
-    </ThemeProvider>
+    <CookiesProvider>
+      <ThemeProvider>
+        <AppRoutes />
+      </ThemeProvider>
+    </CookiesProvider>
   );
 }
 
