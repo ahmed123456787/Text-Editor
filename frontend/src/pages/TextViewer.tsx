@@ -2,24 +2,25 @@ import { useEffect, useContext, useState, useCallback } from "react";
 import { useParams } from "react-router";
 import { DocumentContext } from "../context/DocumentContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlignLeft, AlignRight } from "lucide-react";
 
 const TextViewer = () => {
-  const { sharedId } = useParams<{ sharedId: string }>();
+  const { id: sharedId } = useParams<{ id: string }>();
   const context = useContext(DocumentContext);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [textDirection, setTextDirection] = useState<"ltr" | "rtl">("ltr");
 
   if (!context) {
     throw new Error("DocumentContext is not provided");
   }
 
   const {
-    // connectAsGuest,
+    connectAsGuest,
     currentDocument,
     wsConnected,
-    // isGuest,
-    // canEdit,
+    isGuest,
+    canEdit,
     updateContent,
   } = context;
 
@@ -58,6 +59,10 @@ const TextViewer = () => {
     [canEdit, updateContent]
   );
 
+  const toggleTextDirection = () => {
+    setTextDirection((prev) => (prev === "ltr" ? "rtl" : "ltr"));
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -95,8 +100,26 @@ const TextViewer = () => {
         <h1 className="text-xl font-semibold">
           {currentDocument?.title || "Shared Document"}
         </h1>
-        <div className="text-sm text-muted-foreground">
-          {canEdit ? "You can edit this document" : "Read-only mode"}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTextDirection}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200"
+            title={
+              textDirection === "ltr"
+                ? "Switch to Right-to-Left"
+                : "Switch to Left-to-Right"
+            }
+          >
+            {textDirection === "ltr" ? (
+              <AlignLeft size={14} />
+            ) : (
+              <AlignRight size={14} />
+            )}
+            {textDirection === "ltr" ? "LTR" : "RTL"}
+          </button>
+          <div className="text-sm text-muted-foreground">
+            {canEdit ? "You can edit this document" : "Read-only mode"}
+          </div>
         </div>
       </div>
 
@@ -109,11 +132,17 @@ const TextViewer = () => {
               className="outline-none min-h-[calc(100vh-200px)]"
               suppressContentEditableWarning={true}
               onInput={handleContentChange}
+              dir={textDirection}
+              style={{ textAlign: textDirection === "ltr" ? "left" : "right" }}
             >
               {currentDocument?.content}
             </div>
           ) : (
-            <div className="prose max-w-none">
+            <div
+              className="prose max-w-none"
+              dir={textDirection}
+              style={{ textAlign: textDirection === "ltr" ? "left" : "right" }}
+            >
               {currentDocument?.content.split("\n").map((line, i) => (
                 <p key={i}>{line || <br />}</p>
               ))}

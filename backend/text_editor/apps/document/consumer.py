@@ -17,7 +17,6 @@ User = get_user_model()
 
 
 class UserRole(Enum):
-    GUEST = "guest"
     READER = "reader"
     WRITER = "writer"
 
@@ -149,7 +148,38 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
             traceback.print_exc()
             return False, None
 
+    @database_sync_to_async
+    def save_operation(self, document_id, operation_type, position, new_content, last_version_log):
+        """Save operation log and update document if needed exceed the 50 version"""
 
+        with transaction.atomic():
+            try:
+                # Get the document
+                document = Document.objects.get(id=document_id)
+
+                # Create operation log
+                OperationalLog.objects.create(
+                    document_id=document_id,
+                    operation=operation_type,
+                    position=position,
+                    version=last_version_log + 1,
+                    updated_content=new_content,
+                )
+
+                # Update document content every 50 versions
+                if last_version_log % 50 == 0:
+                    # Update document with new content
+                    document.content = new_content
+
+                # Increment document version
+                document.current_version += 1
+                document.save()
+
+                return True
+            except Exception as e:
+                print(f"Error saving operation: {e}")
+                return False
+            
 
 class DocumentConsumer(BaseDocumentConsumer):
     role = UserRole.WRITER  # Define role as WRITER (Owner)
@@ -334,37 +364,7 @@ class DocumentConsumer(BaseDocumentConsumer):
                     'message': 'Nothing to redo',
                 }))
 
-    @database_sync_to_async
-    def save_operation(self, document_id, operation_type, position, new_content, last_version_log):
-        """Save operation log and update document if needed exceed the 50 version"""
 
-        with transaction.atomic():
-            try:
-                # Get the document
-                document = Document.objects.get(id=document_id)
-
-                # Create operation log
-                OperationalLog.objects.create(
-                    document_id=document_id,
-                    operation=operation_type,
-                    position=position,
-                    version=last_version_log + 1,
-                    updated_content=new_content,
-                )
-
-                # Update document content every 50 versions
-                if last_version_log % 50 == 0:
-                    # Update document with new content
-                    document.content = new_content
-
-                # Increment document version
-                document.current_version += 1
-                document.save()
-
-                return True
-            except Exception as e:
-                print(f"Error saving operation: {e}")
-                return False
 
 
 class GuestDocumentConsumer(BaseDocumentConsumer):
@@ -372,41 +372,55 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
 
     async def connect(self):
         """Handle new WebSocket connection with token-based permissions"""
-        self.user, self.role = await self.authenticate_user()
+        print("guest hello")
+        self.user, self.role,self.document_id = await self.authenticate_user()
+        print(f"User: {self.user}, Role: {self.role}")
+
         if not self.user or not self.role:
             await self.close()
             return
 
-        self.document_id = self.scope['url_route']['kwargs']['document_id']
-        self.room_group_name = f'document_{self.document_id}'
+        # Get document ID from URL route
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
         document = await self.get_document(self.document_id)
         if document:
-            await self.send(text_data=json.dumps({'type': 'INITIALIZE', 'document': document}))
+            print(self.role)
+            await self.send(text_data=json.dumps({'type': 'INITIALIZE', 'document': document,'role': 'Writer'}))
         else:
             await self.close()
 
-    async def authenticate_user(self):
+    @database_sync_to_async
+    def authenticate_user(self):
         """Authenticate user and determine role based on token"""
-        query_string = self.scope.get('query_string', b'').decode('utf-8')
-        query_params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
-        sharedId = query_params.get('sharedId')
-        print("hello from the shared ")
-        if not sharedId:
-            return None, None
+        
+        shared_id_value = self.scope['url_route']['kwargs'].get('shared_id')
+        print("hello from the shared ", shared_id_value)
+        if not shared_id_value:
+            return None, None, None  # Make sure to return 3 values
 
         try:
-            doc_token = DocumentAccessToken.objects.get(shared_id=sharedId)
-            if doc_token.permission == "write":
-                return doc_token.document.user, UserRole.WRITER
-            elif doc_token.permission == "read":
-                return doc_token.document.user, UserRole.READER
-            return None, None
+            token = DocumentAccessToken.objects.get(shared_id=shared_id_value)
+            print("shared id permissions:", token.permissions)
+            
+            # Initialize room_group_name here
+            self.room_group_name = f'document_{token.document.id}'
+            
+            # Check permissions correctly - MultiSelectField stores as comma-separated string
+            if 'write' in token.permissions:
+                print("Giving writer access")
+                return token.document.user, UserRole.WRITER, token.document.id
+            elif 'read' in token.permissions:
+                print("Giving reader access")
+                return token.document.user, UserRole.READER, token.document.id
+            else:
+                print("No valid permissions")
+                return None, None, None
         except DocumentAccessToken.DoesNotExist:
-            return None, None
+            print("Token not found")
+            return None, None, None
 
     async def receive(self, text_data):
         """Handle messages received from WebSocket Client"""

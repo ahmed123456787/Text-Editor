@@ -109,7 +109,7 @@ class WebSocketService {
   }
 
   private buildGuestWebSocketUrl(sharedId: string): URL {
-    return new URL(`/ws/document/shared/${sharedId}`, this.config.baseUrl);
+    return new URL(`/ws/document/shared/${sharedId}/`, this.config.baseUrl);
   }
 
   private getAuthToken(): string {

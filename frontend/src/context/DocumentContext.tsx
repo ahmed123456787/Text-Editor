@@ -27,6 +27,9 @@ interface DocumentContextType {
   setCurrentDocument: React.Dispatch<
     React.SetStateAction<DocumentState | null>
   >;
+  connectAsGuest: (sharedId: string) => Promise<void>;
+  isGuest: boolean;
+  canEdit: boolean;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -48,6 +51,8 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+  const [canEdit, setCanEdit] = useState(true);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -311,6 +316,78 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     [currentDocument, documents]
   );
 
+  const connectAsGuest = useCallback(async (sharedId: string) => {
+    try {
+      setIsLoading(true);
+      websocketService.connectGuest(sharedId);
+      setWsConnected(true);
+      setIsGuest(true);
+
+      return new Promise<void>((resolve, reject) => {
+        const cleanup = websocketService.addMessageHandler((data) => {
+          if (data.type === "INITIALIZE") {
+            console.log("Guest connection initialized:", data);
+            const documentData = data.document;
+
+            // Determine if user can edit based on role/permissions from server
+            const hasEditPermission = data.role === "Writer";
+            console.log("User can edit:", hasEditPermission);
+            setCanEdit(hasEditPermission);
+
+            const guestDocument: DocumentState = {
+              content: documentData.content || "",
+              title: documentData.title || "Shared Document",
+              saved: true,
+              id: documentData.id.toString(),
+              last_update: documentData.updated_at || "Just now",
+              collaborators: documentData.collaborators || [
+                { id: "guest", name: "Guest" },
+              ],
+              version: documentData.version || 0,
+            };
+
+            setCurrentDocument(guestDocument);
+
+            // Add to documents list if not already there
+            setDocuments((prev) => {
+              if (!prev.some((doc) => doc.id === guestDocument.id)) {
+                return [...prev, guestDocument];
+              }
+              return prev;
+            });
+
+            resolve();
+          } else if (data.error) {
+            console.error("Guest connection error:", data.error);
+            setError(data.error);
+            reject(new Error(data.error));
+          }
+        });
+
+        // Set a timeout for the initialization
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error("Connection timeout"));
+        }, 5000);
+
+        // Cleanup function that will be returned
+        const finalCleanup = () => {
+          clearTimeout(timeoutId);
+          cleanup();
+        };
+
+        // Keep track of the cleanup function
+        return finalCleanup;
+      });
+    } catch (err) {
+      console.error("Failed to connect as guest:", err);
+      setError("Failed to connect to the shared document");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return (
     <DocumentContext.Provider
       value={{
@@ -329,6 +406,9 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         handleredo,
         filteredDocuments,
         setFilteredDocuments,
+        connectAsGuest,
+        isGuest,
+        canEdit,
       }}
     >
       {children}
