@@ -1,15 +1,16 @@
-import { useEffect, useContext, useState, useCallback } from "react";
+import { useEffect, useContext, useRef, useCallback, useState } from "react";
 import { useParams } from "react-router";
 import { DocumentContext } from "../context/DocumentContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, AlignLeft, AlignRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const TextViewer = () => {
   const { id: sharedId } = useParams<{ id: string }>();
   const context = useContext(DocumentContext);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [textDirection, setTextDirection] = useState<"ltr" | "rtl">("ltr");
+  const contentEditableRef = useRef<HTMLDivElement | null>(null);
+  const hasInitializedRef = useRef(false);
 
   if (!context) {
     throw new Error("DocumentContext is not provided");
@@ -43,25 +44,27 @@ const TextViewer = () => {
     };
 
     initializeGuestSession();
-
-    return () => {
-      // Cleanup will be handled by the cleanup function from connectAsGuest
-    };
   }, [sharedId, connectAsGuest]);
+
+  useEffect(() => {
+    if (
+      canEdit &&
+      contentEditableRef.current &&
+      currentDocument?.content &&
+      !hasInitializedRef.current
+    ) {
+      contentEditableRef.current.innerText = currentDocument.content;
+      hasInitializedRef.current = true;
+    }
+  }, [canEdit, currentDocument?.content]);
 
   const handleContentChange = useCallback(
     (e: React.FormEvent<HTMLDivElement>) => {
-      if (!canEdit) return;
-
-      const target = e.target as HTMLDivElement;
-      updateContent(target.innerText);
+      const text = e.currentTarget.innerText;
+      updateContent(text);
     },
-    [canEdit, updateContent]
+    [updateContent]
   );
-
-  const toggleTextDirection = () => {
-    setTextDirection((prev) => (prev === "ltr" ? "rtl" : "ltr"));
-  };
 
   if (isLoading) {
     return (
@@ -95,54 +98,31 @@ const TextViewer = () => {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Simple header */}
+      {/* Header */}
       <div className="border-b p-4 flex justify-between items-center">
         <h1 className="text-xl font-semibold">
           {currentDocument?.title || "Shared Document"}
         </h1>
         <div className="flex items-center gap-3">
-          <button
-            onClick={toggleTextDirection}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200"
-            title={
-              textDirection === "ltr"
-                ? "Switch to Right-to-Left"
-                : "Switch to Left-to-Right"
-            }
-          >
-            {textDirection === "ltr" ? (
-              <AlignLeft size={14} />
-            ) : (
-              <AlignRight size={14} />
-            )}
-            {textDirection === "ltr" ? "LTR" : "RTL"}
-          </button>
           <div className="text-sm text-muted-foreground">
             {canEdit ? "You can edit this document" : "Read-only mode"}
           </div>
         </div>
       </div>
 
-      {/* Document content */}
+      {/* Content */}
       <ScrollArea className="flex-1">
         <div className="max-w-3xl mx-auto p-8">
           {canEdit ? (
             <div
+              ref={contentEditableRef}
               contentEditable
-              className="outline-none min-h-[calc(100vh-200px)]"
+              className="outline-none min-h-[calc(100vh-200px)] text-left whitespace-pre-wrap"
               suppressContentEditableWarning={true}
               onInput={handleContentChange}
-              dir={textDirection}
-              style={{ textAlign: textDirection === "ltr" ? "left" : "right" }}
-            >
-              {currentDocument?.content}
-            </div>
+            />
           ) : (
-            <div
-              className="prose max-w-none"
-              dir={textDirection}
-              style={{ textAlign: textDirection === "ltr" ? "left" : "right" }}
-            >
+            <div className="prose max-w-none" dir="ltr">
               {currentDocument?.content.split("\n").map((line, i) => (
                 <p key={i}>{line || <br />}</p>
               ))}
@@ -151,7 +131,7 @@ const TextViewer = () => {
         </div>
       </ScrollArea>
 
-      {/* Simple footer */}
+      {/* Footer */}
       <div className="border-t p-2 text-xs text-muted-foreground">
         <p>
           Shared document •{" "}

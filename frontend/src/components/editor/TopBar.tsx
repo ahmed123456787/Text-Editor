@@ -26,10 +26,13 @@ import {
   MoreVertical,
   ChevronDown,
 } from "lucide-react";
+import { useState } from "react";
 
 import { useRef } from "react";
+
 const TopBar = () => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const [image, setImage] = useState<File | null>(null);
 
   const formatText = (command: string, value = "") => {
     document.execCommand(command, false, value);
@@ -37,6 +40,12 @@ const TopBar = () => {
       editorRef.current.focus();
     }
   };
+
+  const handleuploadImage = (image: File) => {
+    console.log("upload image");
+    setImage(image);
+  };
+
   return (
     <div className="border-b p-1 flex items-center flex-wrap gap-1">
       <DropdownMenu>
@@ -203,8 +212,20 @@ const TopBar = () => {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <ImageIcon className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    console.log("Selected image:", file);
+                    handleuploadImage(file);
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
+              <ImageIcon className="h-4 w-4 pointer-events-none" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Insert image</TooltipContent>

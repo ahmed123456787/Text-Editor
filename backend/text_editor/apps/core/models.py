@@ -102,4 +102,4 @@ class DocumentAccessToken(models.Model):
 
 
     def __str__(self):
-        return f"{self.token}"
+        return f"{self.shared_id}"

@@ -17,8 +17,8 @@ User = get_user_model()
 
 
 class UserRole(Enum):
-    READER = "reader"
-    WRITER = "writer"
+    READER = "Reader"
+    WRITER = "Writer"
 
 
 class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
@@ -387,8 +387,8 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
 
         document = await self.get_document(self.document_id)
         if document:
-            print(self.role)
-            await self.send(text_data=json.dumps({'type': 'INITIALIZE', 'document': document,'role': 'Writer'}))
+            print("test",self.role)
+            await self.send(text_data=json.dumps({'type': 'INITIALIZE', 'document': document,'role': self.role}))
         else:
             await self.close()
 
@@ -411,10 +411,10 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
             # Check permissions correctly - MultiSelectField stores as comma-separated string
             if 'write' in token.permissions:
                 print("Giving writer access")
-                return token.document.user, UserRole.WRITER, token.document.id
+                return token.document.user, UserRole.WRITER.value, token.document.id
             elif 'read' in token.permissions:
                 print("Giving reader access")
-                return token.document.user, UserRole.READER, token.document.id
+                return token.document.user, UserRole.READER.value, token.document.id
             else:
                 print("No valid permissions")
                 return None, None, None

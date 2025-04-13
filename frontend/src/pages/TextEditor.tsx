@@ -21,7 +21,7 @@ export default function TextEditor() {
   } = context;
   console.log("currentDocument", currentDocument);
   const [content, setContent] = useState("");
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastSaved] = useState<Date | null>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(true);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -89,31 +89,37 @@ export default function TextEditor() {
       const target = e.target as HTMLDivElement;
       console.log("target", target.innerHTML);
       setContent(target.innerText);
-      updateContent(target.innerText);
+
+      if (currentDocument) {
+        updateContent(target.innerText);
+      }
     },
-    []
+    [currentDocument, updateContent]
   );
+
+  // If no document is selected, show a message
+  if (!currentDocument) {
+    return <p>def</p>;
+  }
 
   return (
     <div className="flex flex-col h-screen">
       {/* Top Navigation Bar */}
-      {currentDocument && (
-        <Header
-          document={currentDocument}
-          isStarred={isStarred}
-          setDocumentTitle={(title) => {
-            currentDocument.title = title;
-            setContent(title);
-          }}
-          setIsStarred={setIsStarred}
-        />
-      )}
+      <Header
+        document={currentDocument}
+        isStarred={isStarred}
+        setDocumentTitle={(title) => {
+          currentDocument.title = title;
+          setContent(title);
+        }}
+        setIsStarred={setIsStarred}
+      />
       {/* Toolbar */}
       <TopBar />
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto">
-          <div className="max-w-3xl mx-auto p-8 min-h-full">
+          <div className="max-w-8xl mx-auto p-8 min-h-full">
             <div
               ref={editorRef}
               contentEditable

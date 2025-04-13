@@ -52,7 +52,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [canEdit, setCanEdit] = useState(true);
+  const [canEdit, setCanEdit] = useState(false);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -156,7 +156,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   }, []);
 
   useEffect(() => {
-    if (!currentDocument) return;
+    if (!currentDocument || isGuest) return; // Add isGuest check here
 
     websocketService.connectOwner(currentDocument.id);
     setWsConnected(true);
@@ -202,7 +202,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
       websocketService.disconnect();
       setWsConnected(false);
     };
-  }, [currentDocument?.id]);
+  }, [currentDocument?.id, isGuest]); // Add isGuest to dependencies
 
   const selectDocument = useCallback(
     (id: string) => {
@@ -222,8 +222,9 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
 
   const updateContent = useCallback(
     (content: string) => {
+      console.log(currentDocument);
       if (!currentDocument) return;
-
+      console.log("Updating content:", currentDocument.version);
       const newVersion = currentDocument.version + 1;
 
       const updatedDocuments = documents.map((doc) =>
