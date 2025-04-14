@@ -3,6 +3,12 @@ interface Collaborator {
   name: string;
 }
 
+export interface Image {
+  id: string;
+  url: string;
+  alt?: string;
+}
+
 export interface DocumentState {
   content: string;
   title: string;
@@ -11,4 +17,5 @@ export interface DocumentState {
   last_update: string;
   collaborators: Collaborator[];
   version: number; // Add version tracking
+  images: Image[]; // Add images array to store document images
 }

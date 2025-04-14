@@ -7,7 +7,7 @@ import {
 } from "react";
 import { getDocuments } from "../services/apis/documentApi";
 import { websocketService } from "../services/websocket";
-import { DocumentState } from "../types/index";
+import { DocumentState, Image } from "../types/index";
 
 interface DocumentContextType {
   documents: DocumentState[];
@@ -30,6 +30,8 @@ interface DocumentContextType {
   connectAsGuest: (sharedId: string) => Promise<void>;
   isGuest: boolean;
   canEdit: boolean;
+  addImage: (image: Image) => void;
+  removeImage: (imageId: string) => void;
 }
 
 export const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -67,7 +69,8 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
           id: doc.id.toString(),
           last_update: doc.updated_at || "Just now",
           collaborators: doc.collaborators || [{ id: "1", name: "You" }],
-          version: doc.version || 0, // Initialize version
+          version: doc.version || 0,
+          images: doc.images || [],
         }));
         setDocuments(formattedDocuments);
 
@@ -345,6 +348,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
                 { id: "guest", name: "Guest" },
               ],
               version: documentData.version || 0,
+              images: documentData.images || [],
             };
 
             setCurrentDocument(guestDocument);
@@ -389,6 +393,62 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
     }
   }, []);
 
+  const addImage = useCallback(
+    (image: Image) => {
+      if (!currentDocument) return;
+
+      const updatedDocuments = documents.map((doc) =>
+        doc.id === currentDocument.id
+          ? { ...doc, images: [...doc.images, image] }
+          : doc
+      );
+
+      setDocuments(updatedDocuments);
+      setCurrentDocument({
+        ...currentDocument,
+        images: [...currentDocument.images, image],
+      });
+
+      if (wsConnected) {
+        websocketService.send({
+          type: "IMAGE_ADD",
+          document_id: currentDocument.id,
+          image,
+          version: currentDocument.version,
+        });
+      }
+    },
+    [currentDocument, documents, wsConnected]
+  );
+
+  const removeImage = useCallback(
+    (imageId: string) => {
+      if (!currentDocument) return;
+
+      const updatedDocuments = documents.map((doc) =>
+        doc.id === currentDocument.id
+          ? { ...doc, images: doc.images.filter((img) => img.id !== imageId) }
+          : doc
+      );
+
+      setDocuments(updatedDocuments);
+      setCurrentDocument({
+        ...currentDocument,
+        images: currentDocument.images.filter((img) => img.id !== imageId),
+      });
+
+      if (wsConnected) {
+        websocketService.send({
+          type: "IMAGE_REMOVE",
+          document_id: currentDocument.id,
+          imageId,
+          version: currentDocument.version,
+        });
+      }
+    },
+    [currentDocument, documents, wsConnected]
+  );
+
   return (
     <DocumentContext.Provider
       value={{
@@ -410,6 +470,8 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
         connectAsGuest,
         isGuest,
         canEdit,
+        addImage,
+        removeImage,
       }}
     >
       {children}

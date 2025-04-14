@@ -118,3 +118,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Image container styles */
+.image-container {
+  position: relative;
+  display: inline-block;
+  margin: 1rem 0;
+}
+
+.image-container:hover {
+  outline: 2px dashed #3b82f6;
+}
+
+.resizable-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background-color: #3b82f6;
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+
+.image-container:hover .resize-handle {
+  opacity: 1;
+}
+
+.delete-image {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px;
+  background-color: #ef4444;
+  color: white;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-container:hover .delete-image {
+  opacity: 1;
+}
+
+.delete-image:hover {
+  background-color: #dc2626;
+}
