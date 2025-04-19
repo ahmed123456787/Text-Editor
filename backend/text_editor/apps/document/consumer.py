@@ -10,7 +10,8 @@ from .utils import get_position_of_change_async
 from django.utils.timesince import timesince
 from django.utils.timezone import now
 from abc import ABC, abstractmethod
-from enum import Enum  # Add import for Enum
+from enum import Enum 
+import uuid
 
 
 User = get_user_model()
@@ -61,10 +62,13 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
     def get_document(self, document_id):
         try:
             document = Document.objects.get(id=document_id)
+            # Don't manipulate the content here, just use it as is
+            content = document.content
+
             return {
                 'id': str(document.id),
                 'title': document.title,
-                'content': document.content,
+                'content': content,
                 'version': document.current_version,
                 'last_updated': timesince(document.updated_at, now()) + " ago",
             }
@@ -151,25 +155,32 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
     @database_sync_to_async
     def save_operation(self, document_id, operation_type, position, new_content, last_version_log):
         """Save operation log and update document if needed exceed the 50 version"""
-
         with transaction.atomic():
             try:
                 # Get the document
                 document = Document.objects.get(id=document_id)
 
-                # Create operation log
+                # Process the content based on operation type
+                processed_content = self._process_content(operation_type, new_content, position)
+                print("processed_content", processed_content)   
+                # Create operation log with additional metadata
+                operation_data = {
+                    'position': position,
+                    'content_type': processed_content.get('type', 'text'),
+                    'block_id': processed_content.get('block_id', str(uuid.uuid4()))
+                }
+
                 OperationalLog.objects.create(
                     document_id=document_id,
                     operation=operation_type,
                     position=position,
                     version=last_version_log + 1,
-                    updated_content=new_content,
+                    updated_content=processed_content,
+                    operation_data=operation_data
                 )
 
-                # Update document content every 50 versions
-                if last_version_log % 50 == 0:
-                    # Update document with new content
-                    document.content = new_content
+                # Always update document with new content
+                document.content = processed_content
 
                 # Increment document version
                 document.current_version += 1
@@ -179,7 +190,66 @@ class BaseDocumentConsumer(AsyncWebsocketConsumer, ABC):
             except Exception as e:
                 print(f"Error saving operation: {e}")
                 return False
+
+    def _process_content(self, operation_type, content, position):
+        """Process and structure the content based on its type"""
+        try:
+            print("operation type", operation_type)
+            print(type(content), " type of the content")
             
+            # If content is a string, convert it to the proper structure
+            if isinstance(content, str):
+                content = {
+                    "blocks": [],
+                    "type": "text",
+                    "content": content
+                }
+            
+            # Ensure content has a blocks array
+            if "blocks" not in content:
+                content["blocks"] = []
+
+            # Handle different operation types
+            if operation_type == 'insert':
+                # Add new block to the content
+                block = {
+                    "type": "text",  # Default to text, can be changed based on content
+                    "content": content.get("content", ""),
+                    "metadata": {
+                        "position": position,
+                        "style": {}
+                    }
+                }
+                content["blocks"].insert(position, block)
+
+            elif operation_type == 'image_insert':
+                # Add image block to the content
+                block = {
+                    "type": "image",
+                    "content": content.get("content", ""),  # This should be the image URL
+                    "metadata": {
+                        "position": position,
+                        "style": {
+                            "width": "100%",
+                            "height": "auto"
+                        }
+                    }
+                }
+                content["blocks"].insert(position, block)
+
+            elif operation_type == 'delete':
+                pass
+                # Remove block at the specified position
+                # if position < len(content.get("blocks", [])):
+                #     content["blocks"].pop(position)
+            
+            print("blocks", content)
+            return content
+
+        except Exception as e:
+            print(f"Error processing content: {e}")
+            return content
+
 
 class DocumentConsumer(BaseDocumentConsumer):
     role = UserRole.WRITER  # Define role as WRITER (Owner)
@@ -236,7 +306,9 @@ class DocumentConsumer(BaseDocumentConsumer):
 
             # Get the document content or the last log
             last_log = await self.get_last_log()
+
             if last_log:
+                print("last_log", last_log)
                 # Send the last log to the newly connected user
                 await self.send(text_data=json.dumps({
                     'type': 'INITIALIZE',
@@ -300,11 +372,22 @@ class DocumentConsumer(BaseDocumentConsumer):
         print("Received data:", data)
 
         operation_type = data.get('type')
+        content = data.get('content')
+        position = data.get('position')
 
         if operation_type == 'UPDATE':
+            # Process string content into proper structure
+            if isinstance(content, str):
+                structured_content = {
+                    "blocks": [],
+                    "type": "text",
+                    "content": content
+                }
+                content = structured_content
+                
             # Process operation of update document content
-            position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
-            success = await self.save_operation(self.document_id, opertype, position, data['content'], last_version_log)
+            position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, content)
+            success = await self.save_operation(self.document_id, opertype, position, content, last_version_log)
             if not success:
                 print(f"Failed to save operation for document_id: {self.document_id}")
                 return
@@ -322,11 +405,28 @@ class DocumentConsumer(BaseDocumentConsumer):
                     'type': 'document_update',
                     'document': {
                         'id': str(document['id']),
-                        'content': data['content'],
+                        'content': document['content'],
                         'version': document['version'],
                     },
                 }
             )
+
+        elif operation_type == 'IMAGE_INSERT':
+            # Handle image insertion
+            success = await self.save_operation(self.document_id, 'image_insert', position, content, document['version'])
+            if success:
+                document = await self.get_document(self.document_id)
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'document_update',
+                        'document': {
+                            'id': str(document['id']),
+                            'content': document['content'],
+                            'version': document['version'],
+                        },
+                    }
+                )
 
         elif operation_type == 'UNDO':
             # Process undo operation
@@ -431,10 +531,21 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
         if self.role == UserRole.WRITER:
             data = json.loads(text_data)
             operation_type = data.get('type')
+            content = data.get('content')
+            position = data.get('position')
 
             if operation_type == 'UPDATE':
-                position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, data['content'])
-                success = await self.save_operation(self.document_id, opertype, position, data['content'], last_version_log)
+                # Process string content into proper structure
+                if isinstance(content, str):
+                    structured_content = {
+                        "blocks": [],
+                        "type": "text",
+                        "content": content
+                    }
+                    content = structured_content
+                
+                position, opertype, changed_content, last_version_log = await get_position_of_change_async(self.document_id, content)
+                success = await self.save_operation(self.document_id, opertype, position, content, last_version_log)
                 if not success:
                     return
 
@@ -449,11 +560,28 @@ class GuestDocumentConsumer(BaseDocumentConsumer):
                         'type': 'document_update',
                         'document': {
                             'id': str(document['id']),
-                            'content': data['content'],
+                            'content': document['content'],
                             'version': document['version'],
                         },
                     }
                 )
+
+            elif operation_type == 'IMAGE_INSERT':
+                # Handle image insertion
+                success = await self.save_operation(self.document_id, 'image_insert', position, content, document['version'])
+                if success:
+                    document = await self.get_document(self.document_id)
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'document_update',
+                            'document': {
+                                'id': str(document['id']),
+                                'content': document['content'],
+                                'version': document['version'],
+                            },
+                        }
+                    )
 
     async def document_update(self, event):
         """Handle document updates and broadcast to all connected users"""

@@ -224,7 +224,7 @@ export const DocumentProvider = ({ children }: DocumentProviderProps) => {
   );
 
   const updateContent = useCallback(
-    (content: string) => {
+    (content: any) => {
       console.log(currentDocument);
       if (!currentDocument) return;
       console.log("Updating content:", currentDocument.version);

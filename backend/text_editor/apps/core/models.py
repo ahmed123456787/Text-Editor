@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import UserManager, AbstractBaseUser,PermissionsMixin
 from django.db.models import JSONField
-from multiselectfield import MultiSelectField  # Add this import
+from multiselectfield import MultiSelectField
 
 
 class CustomeUserManager(UserManager):
@@ -43,7 +43,7 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
 
 class Document(models.Model):
     title = models.CharField(max_length=255)
-    content = models.TextField()
+    content = JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
@@ -54,20 +54,22 @@ class Document(models.Model):
 
 
 class OperationalLog(models.Model):
-    
     CHOICES = (
         ('insert', 'Insert'),
         ('delete', 'Delete'),
-        ('undo', 'Undo')  # Add undo operation type
+        ('undo', 'Undo'),
+        ('redo', 'Redo'),
+        ('image_insert', 'Image Insert'),
+        ('image_delete', 'Image Delete')
     )
 
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='logs')
     operation = models.CharField(max_length=255, choices=CHOICES)
     version = models.IntegerField(default=1)
-    updated_content = models.TextField(blank=True)  # Store the full content of the document
+    updated_content = JSONField(blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
-    position = models.IntegerField()
-    operation_data = JSONField(null=True, blank=True)  # Store operation details (e.g., text, length)
+    position = models.IntegerField(null=True, blank=True)
+    operation_data = JSONField(null=True, blank=True)
 
     class Meta:
         ordering = ['version']
@@ -76,7 +78,7 @@ class OperationalLog(models.Model):
         return f"{self.document.title} - v{self.version} - {self.operation}"
 
     @staticmethod
-    def create_log(document, operation, position, operation_data, updated_content):
+    def create_log(document, operation, position=None, operation_data=None, updated_content=None):
         """
         Helper method to create an OperationalLog entry.
         """
@@ -86,7 +88,7 @@ class OperationalLog(models.Model):
             version=document.current_version + 1,
             position=position,
             operation_data=operation_data,
-            updated_content=updated_content,
+            updated_content=updated_content
         )
     
 
@@ -98,7 +100,7 @@ class DocumentAccessToken(models.Model):
     document = models.OneToOneField(Document, on_delete=models.CASCADE)
     shared_id = models.CharField(max_length=10, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    permissions = MultiSelectField(choices=PERMISSIONS)  # Allow multiple selections
+    permissions = MultiSelectField(choices=PERMISSIONS)
 
 
     def __str__(self):

@@ -19,33 +19,89 @@ export default function TextEditor() {
     handleredo,
     wsConnected,
   } = context;
-  console.log("currentDocument", currentDocument);
+
   const [content, setContent] = useState("");
   const [lastSaved] = useState<Date | null>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(true);
   const editorRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef(content); // Ref to track content without causing re-renders
+  const contentRef = useRef(content);
+  const isLocalUpdate = useRef(false);
 
   // Update the content ref when the state changes
   useEffect(() => {
     contentRef.current = content;
   }, [content]);
 
-  // Set initial content from document
+  // Initial document content setup
   useEffect(() => {
-    if (currentDocument && currentDocument.content !== contentRef.current) {
-      setContent(currentDocument.content);
+    if (currentDocument && currentDocument.content) {
+      // Get the content string, handling different formats
+      const documentContent =
+        typeof currentDocument.content === "string"
+          ? currentDocument.content
+          : currentDocument.content.content || "";
 
-      // Update editor content if needed
-      if (
-        editorRef.current &&
-        editorRef.current.innerText !== currentDocument.content
-      ) {
-        editorRef.current.innerText = currentDocument.content;
+      // Only update if content has actually changed and it's not a local update
+      if (!isLocalUpdate.current && documentContent !== contentRef.current) {
+        setContent(documentContent);
+
+        // Update editor DOM content if needed
+        if (editorRef.current) {
+          const selection = window.getSelection();
+          const hadFocus = document.activeElement === editorRef.current;
+
+          // Save cursor position if we have a selection
+          let savedRange = null;
+          if (selection && selection.rangeCount > 0) {
+            savedRange = selection.getRangeAt(0).cloneRange();
+          }
+
+          // Update content
+          editorRef.current.innerText = documentContent;
+
+          // Restore focus and cursor position
+          if (hadFocus && savedRange) {
+            editorRef.current.focus();
+            try {
+              // Create a new range within the valid text nodes
+              const newRange = document.createRange();
+              const textNode =
+                editorRef.current.firstChild || editorRef.current;
+
+              // Calculate safe positions
+              const safeStart = Math.min(
+                savedRange.startOffset,
+                documentContent.length
+              );
+              const safeEnd = Math.min(
+                savedRange.endOffset,
+                documentContent.length
+              );
+
+              newRange.setStart(textNode, safeStart);
+              newRange.setEnd(textNode, safeEnd);
+
+              // Apply selection
+              const currentSelection = window.getSelection();
+              if (currentSelection) {
+                currentSelection.removeAllRanges();
+                currentSelection.addRange(newRange);
+              }
+            } catch (e) {
+              console.log("Error restoring cursor:", e);
+            }
+          }
+        }
       }
-    }
 
+      // Reset the local update flag
+      isLocalUpdate.current = false;
+    }
+  }, [currentDocument]);
+
+  // Event handlers
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
@@ -60,6 +116,7 @@ export default function TextEditor() {
         }
       }
     };
+
     const textarea = editorRef.current;
     if (textarea) {
       textarea.addEventListener("keydown", handleKeyDown);
@@ -70,28 +127,20 @@ export default function TextEditor() {
         textarea.removeEventListener("keydown", handleKeyDown);
       }
     };
-  }, [currentDocument]);
-
-  // Separate effect for auto-save to prevent content dependency issues
-  // useEffect(() => {
-  //   const saveInterval = setInterval(() => {
-  //     if (contentRef.current) {
-  //       setLastSaved(new Date());
-  //       // Here you would actually save the document
-  //     }
-  //   }, 5000);
-
-  //   return () => clearInterval(saveInterval);
-  // }, []); // No dependencies to prevent re-renders
+  }, [currentDocument, wsConnected, handleUndo, handleredo]);
 
   const handleContentChange = useCallback(
     (e: React.FormEvent<HTMLDivElement>) => {
       const target = e.target as HTMLDivElement;
-      console.log("target", target.innerHTML);
-      setContent(target.innerText);
+      const newContent = target.innerText;
+
+      // Set flag to indicate this is a local update
+      isLocalUpdate.current = true;
+
+      setContent(newContent);
 
       if (currentDocument) {
-        updateContent(target.innerText);
+        updateContent(newContent);
       }
     },
     [currentDocument, updateContent]
@@ -99,7 +148,7 @@ export default function TextEditor() {
 
   // If no document is selected, show a message
   if (!currentDocument) {
-    return <p>def</p>;
+    return <p>No document selected</p>;
   }
 
   return (

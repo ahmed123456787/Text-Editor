@@ -13,7 +13,7 @@ const StatusBar = ({ content, lastSaved }: StatusBarProps) => {
   useEffect(() => {
     if (content) {
       setCharCount(content.length);
-      setWordCount(content.trim().split(/\s+/).filter(Boolean).length);
+      // setWordCount(content.trim().split(/\s+/).filter(Boolean).length);
     } else {
       setCharCount(0);
       setWordCount(0);

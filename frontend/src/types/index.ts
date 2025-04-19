@@ -10,7 +10,11 @@ export interface Image {
 }
 
 export interface DocumentState {
-  content: string;
+  content: {
+    blocks: [];
+    type: "text" | "image";
+    content: string;
+  };
   title: string;
   saved: boolean;
   id: string;

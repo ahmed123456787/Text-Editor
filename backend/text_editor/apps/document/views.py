@@ -27,14 +27,36 @@ class DocumentView(ListCreateAPIView, DestroyAPIView):
         serializer.is_valid(raise_exception=True)
         
         # Assign the current user to the document before saving
-        serializer.save(user=request.user)
+        document = serializer.save(user=request.user)
         
         headers = self.get_success_headers(serializer.data)
+        
+        # Format response to match WebSocket format
+        response_data = {
+            'type': 'INITIALIZE',
+            'document': {
+                'id': str(document.id),
+                'title': document.title,
+                'content': document.content,
+                'version': document.current_version,
+            }
+        }
+        
         return Response(
-            serializer.data,
+            response_data,
             status=status.HTTP_201_CREATED,
             headers=headers
         )
+
+    def list(self, request, *args, **kwargs):
+        """
+        Handle listing of documents
+        """
+        queryset = self.filter_queryset(self.get_queryset().filter(user=request.user))
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Return standard list response - no need to match WebSocket format for lists
+        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         """
