@@ -93,7 +93,7 @@ ALLOWED_HOSTS = ["*"]
 WSGI_APPLICATION = 'text_editor.wsgi.application'
 ASGI_APPLICATION = 'text_editor.asgi.application'
 
-CSRF_TRUSTED_ORIGINS = ["https://*.railway.internal"]
+CSRF_TRUSTED_ORIGINS = ["https://text-editor-production-6731.up.railway.app"]
 
 DATABASES = {
     'default': {
