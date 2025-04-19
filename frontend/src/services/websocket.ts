@@ -19,7 +19,7 @@ class WebSocketService {
 
   constructor(config?: Partial<WebSocketConfig>) {
     this.config = {
-      baseUrl: "ws://127.0.0.1:8000",
+      baseUrl: "ws://text-editor-production-6731.up.railway.app/",
       maxReconnectAttempts: 5,
       initialConnectionDelay: 500,
       reconnectionDelayFactor: 2,
