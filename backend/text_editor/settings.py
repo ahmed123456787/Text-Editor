@@ -92,11 +92,11 @@ ASGI_APPLICATION = 'text_editor.asgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-# os.environ.setdefault("PGDATABASE", "liftoff_dev")
-# os.environ.setdefault("PGUSER", "username")
-# os.environ.setdefault("PGPASSWORD", "")
-# os.environ.setdefault("PGHOST", "localhost")
-# os.environ.setdefault("PGPORT", "5432")
+os.environ.setdefault("PGDATABASE", "liftoff_dev")
+os.environ.setdefault("PGUSER", "username")
+os.environ.setdefault("PGPASSWORD", "")
+os.environ.setdefault("PGHOST", "localhost")
+os.environ.setdefault("PGPORT", "5432")
 
 DATABASES = {
     'default': {
