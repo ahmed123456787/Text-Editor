@@ -53,7 +53,7 @@ const TextViewer = () => {
       currentDocument?.content &&
       !hasInitializedRef.current
     ) {
-      contentEditableRef.current.innerText = currentDocument.content;
+      contentEditableRef.current.innerText = currentDocument.content.content;
       hasInitializedRef.current = true;
     }
   }, [canEdit, currentDocument?.content]);
@@ -123,7 +123,7 @@ const TextViewer = () => {
             />
           ) : (
             <div className="prose max-w-none" dir="ltr">
-              {currentDocument?.content.split("\n").map((line, i) => (
+              {currentDocument?.content.content.split("\n").map((line, i) => (
                 <p key={i}>{line || <br />}</p>
               ))}
             </div>
