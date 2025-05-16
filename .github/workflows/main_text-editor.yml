@@ -34,7 +34,12 @@ jobs:
 
       # create .env file
       - name: Copy .env file
-        run: cp .env.example .env
+        run: |
+          if [ -f ../backend/.env ]; then
+            cp ../backend/.env .env
+          else
+            echo "No ../backend/.env file found, skipping copy."
+          fi
 
       # Install backend dependencies
       - name: Install Dependencies
