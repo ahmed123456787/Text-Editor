@@ -41,6 +41,15 @@ jobs:
             echo "No ../backend/.env file found, skipping copy."
           fi
 
+      # Load environment variables from .env file
+      - name: Load .env file
+        run: |
+          if [ -f ../backend/.env ]; then
+            export $(grep -v '^#' ../backend/.env | xargs)
+          else
+            echo "No ../backend/.env file found, skipping environment variable loading."
+          fi
+
       # Install backend dependencies
       - name: Install Dependencies
         run: |
