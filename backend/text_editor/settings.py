@@ -98,10 +98,10 @@ CSRF_TRUSTED_ORIGINS = ["https://text-editor-production-6731.up.railway.app"]
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get("PGDATABASE", "default_db"),
-        'USER': os.environ.get("PGUSER", "default_user"),
-        'PASSWORD': os.environ.get("PGPASSWORD", "default_password"),
-        'HOST': os.environ.get("PGHOST", "localhost"),
+        'NAME': os.environ.get("PGDATABASE", "postgres"),
+        'USER': os.environ.get("PGUSER", "lqecmzvauy"),
+        'PASSWORD': os.environ.get("PGPASSWORD", "your-password "),
+        'HOST': os.environ.get("PGHOST", "text-editor-server.postgres.database.azure.com"),
         'PORT': os.environ.get("PGPORT", "5432"),
     }
 }
