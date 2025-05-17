@@ -65,6 +65,12 @@ jobs:
           cd backend
           python manage.py collectstatic --noinput
 
+      # Create admin superuser
+      - name: Create Admin Superuser
+        run: |
+          cd backend
+          python manage.py create_admin_user
+
       # Deploy to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
