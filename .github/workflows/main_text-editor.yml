@@ -70,6 +70,19 @@ jobs:
           mkdir -p static
           mkdir -p staticfiles
 
+      # Run database migrations
+      - name: Run Database Migrations
+        env:
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          PGHOST: ${{ secrets.PGHOST }}
+          PGPORT: ${{ secrets.PGPORT }}
+        run: |
+          cd backend
+          python manage.py makemigrations
+          python manage.py migrate
+
       # Prepare backend static files
       - name: Create Static Files
         env:
